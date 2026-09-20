@@ -31,6 +31,7 @@ body{
   min-height:100vh;line-height:1.45;font-size:16px;-webkit-tap-highlight-color:transparent;
 }
 #app{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px 8px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 h1{font-size:30px;color:var(--ink);line-height:1.1}
 .sub{color:var(--ink-soft);font-size:15px;margin-top:6px}
 .sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;margin-top:22px}
@@ -41,18 +42,84 @@ h1{font-size:30px;color:var(--ink);line-height:1.1}
   font:700 17px/1.2 system-ui,sans-serif;border:1.5px solid var(--ink);background:var(--ink);color:var(--on-ink)}
 .btn.ghost{background:var(--paper);color:var(--ink)}
 .btn:disabled{opacity:.35;cursor:default}
+.langbar{display:flex;border:1.5px solid var(--ink-soft);border-radius:999px;overflow:hidden;flex:none}
+.langbar button{appearance:none;border:0;background:transparent;color:var(--ink-soft);cursor:pointer;
+  font:700 12.5px/1 system-ui,sans-serif;letter-spacing:.06em;padding:8px 11px;min-height:34px;text-transform:uppercase}
+.langbar button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
 .home{max-width:520px;margin:0 auto;padding:18px 16px calc(28px + env(safe-area-inset-bottom));text-align:center}
 .home a{color:var(--ink-soft);font-size:14px;text-decoration:none;border-bottom:1px dashed var(--ink-soft)}
 </style>
+<script>
+/* Shared language runtime. The key is origin-wide, so the choice made here also
+   applies to the index and every other app. Kept inside the file rather than
+   injected at build time so opening this straight from a git clone still works.
+   Delete this block and the langBar() call below for a single-language app. */
+(function(){
+  var K='jnssn-lang', LANGS=['en','fr'], DEF='en';
+  function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
+  function initial(){
+    var s=stored(); if(LANGS.indexOf(s)>-1) return s;
+    var nav=(navigator.languages||[navigator.language||'']).join(',').toLowerCase();
+    for(var i=0;i<LANGS.length;i++) if(nav.indexOf(LANGS[i])>-1) return LANGS[i];
+    return DEF;
+  }
+  var cur=initial();
+  document.documentElement.lang=cur;
+  window.JLang={
+    langs:LANGS,
+    get:function(){ return cur; },
+    set:function(l){
+      if(LANGS.indexOf(l)<0||l===cur) return;
+      cur=l; document.documentElement.lang=l;
+      try{ localStorage.setItem(K,l); }catch(e){}
+      window.dispatchEvent(new CustomEvent('jlangchange',{detail:l}));
+    }
+  };
+})();
+</script>
 </head>
 <body>
 <main id="app"></main>
-<nav class="home"><a href="/">&larr; all apps</a></nav>
+<nav class="home"><a href="/" id="homelink">&larr; all games</a></nav>
 <script>
 (function(){
   var KEY = 'SLUG-v1';   // bump the suffix only when old saved state can no longer be read
   var app = document.getElementById('app');
+
+  /* ---------- strings ----------
+     Every user-facing string lives here, never inline in the markup. A value is
+     either a string or a function when it takes arguments. Note the plural
+     rules differ: French marks from 2 up, English from anything but 1. */
+  var L = {
+    en: {
+      docTitle:'APP TITLE', home:'← all games',
+      heading:'APP TITLE', sub:'One line describing what this does.',
+      count:'Count',
+      items:function(n){ return n+' '+(n===1?'item':'items'); },
+      add:'Add one', reset:'Start over'
+    },
+    fr: {
+      docTitle:'TITRE', home:'← tous les jeux',
+      heading:'TITRE', sub:'Une ligne décrivant ce que ça fait.',
+      count:'Total',
+      items:function(n){ return n+' '+(n>1?'éléments':'élément'); },
+      add:'Ajouter', reset:'Recommencer'
+    }
+  };
+  function D(){ return L[window.JLang ? window.JLang.get() : 'en'] || L.en; }
+  function t(k){
+    var v = D()[k];
+    if(typeof v !== 'function') return v;
+    return v.apply(null, Array.prototype.slice.call(arguments, 1));
+  }
+  function langBar(){
+    var l = window.JLang;
+    if(!l || l.langs.length < 2) return '';
+    return '<div class="langbar" role="group" aria-label="Language">' + l.langs.map(function(c){
+      return '<button type="button" data-lang="'+c+'" aria-pressed="'+(c===l.get())+'">'+c+'</button>';
+    }).join('') + '</div>';
+  }
 
   function fresh(){ return {count:0}; }
 
@@ -70,20 +137,28 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(-
 
   var S = load() || fresh();
 
-  function esc(t){ return String(t).replace(/[&<>"']/g, function(c){
+  function esc(x){ return String(x).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
   function render(){
+    document.title = t('docTitle');
+    document.getElementById('homelink').innerHTML = t('home');
     app.innerHTML =
-      '<h1>APP TITLE</h1>' +
-      '<p class="sub">One line describing what this does.</p>' +
-      '<div class="sheet"><div class="row"><span>Count</span><strong>'+esc(S.count)+'</strong></div></div>' +
-      '<button class="btn" data-act="inc">Add one</button>' +
-      '<button class="btn ghost" data-act="reset">Start over</button>';
+      '<div class="top"><h1>'+esc(t('heading'))+'</h1>'+langBar()+'</div>' +
+      '<p class="sub">'+esc(t('sub'))+'</p>' +
+      '<div class="sheet"><div class="row"><span>'+esc(t('count'))+'</span><strong>'+esc(t('items',S.count))+'</strong></div></div>' +
+      '<button class="btn" data-act="inc">'+esc(t('add'))+'</button>' +
+      '<button class="btn ghost" data-act="reset">'+esc(t('reset'))+'</button>';
     save();
   }
 
+  // Re-render in the new language without losing any state.
+  window.addEventListener('jlangchange', render);
+
   document.addEventListener('click', function(e){
+    var lb = e.target.closest && e.target.closest('[data-lang]');
+    if(lb){ if(window.JLang) window.JLang.set(lb.getAttribute('data-lang')); return; }
+
     var b = e.target.closest && e.target.closest('[data-act]');
     if(!b || b.disabled) return;
     switch(b.getAttribute('data-act')){

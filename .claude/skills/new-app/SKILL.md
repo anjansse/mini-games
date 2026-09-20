@@ -1,6 +1,6 @@
 ---
 name: new-app
-description: Scaffold, register, commit and publish a new static app in this repo. Use when Antoine asks for a new app, game, tool, calculator, tracker or page to live at apps.jnssn.io — e.g. "make me a tip splitter", "new app: packing list", "build a dice roller". Also use when migrating an existing Claude artifact into this repo.
+description: Scaffold, register, commit and publish a new game or app in this repo. Use when Antoine asks for a new app, game, tool, calculator, tracker or page to live at games.jnssn.io — e.g. "make me a tip splitter", "new app: packing list", "build a dice roller". Also use when migrating an existing Claude artifact into this repo.
 ---
 
 # new-app
@@ -10,6 +10,11 @@ hand back the URL plus the one-line command to switch it on.
 
 Read `CLAUDE.md` first. It holds the app conventions, the commit format and the
 protected DNS records. This skill does not repeat them.
+
+For how to actually write the file — the single-file rule, guarded
+`localStorage`, light/dark tokens, phone layout, i18n and plural rules — use the
+`self-contained-html` skill from the `self-contained-web` plugin. This skill
+covers only the repo mechanics around it.
 
 ## 1. Pick a slug
 
@@ -81,6 +86,8 @@ git commit -m "feat(apps): add <slug>"
 git push -u origin main
 ```
 
+`dist/` is git-ignored; Cloudflare Pages regenerates it.
+
 One commit. Use the Conventional Commits format from `CLAUDE.md`, and end the
 message with the attribution lines the session requires.
 
@@ -89,7 +96,7 @@ message with the attribution lines the session requires.
 Keep it to four lines:
 
 ```
-<Title> is live at https://apps.jnssn.io/<slug>/ — currently off, so it shows
+<Title> is live at https://games.jnssn.io/<slug>/ — currently off, so it shows
 the "switched off" page.
 
 To turn it on, send me: enable <slug>

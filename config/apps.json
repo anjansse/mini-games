@@ -1,9 +1,20 @@
 {
-  "$comment": "Single source of truth for routing and flags. Set enabled:false to take an app offline; its slug then serves the 'switched off' page instead of 404. Array order is the order on the landing page.",
+  "$comment": "Single source of truth for routing and flags. Set enabled:false to take an app offline; its slug then serves the 'switched off' page instead of 404. Array order is the order on the landing page. Any user-facing string may be a plain string or an object keyed by language code.",
   "site": {
-    "title": "jnssn.io apps",
-    "tagline": "Small self-contained things, made on a phone.",
-    "domain": "apps.jnssn.io"
+    "title": {
+      "en": "Games",
+      "fr": "Jeux"
+    },
+    "tagline": {
+      "en": "Small self-contained things, made on a phone.",
+      "fr": "De petites choses autonomes, faites au téléphone."
+    },
+    "domain": "games.jnssn.io",
+    "languages": [
+      "en",
+      "fr"
+    ],
+    "defaultLanguage": "en"
   },
   "apps": [
     {

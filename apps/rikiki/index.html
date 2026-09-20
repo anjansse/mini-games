@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Rikiki, feuille de score</title>
-<meta name="description" content="Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.">
+<title>Rikiki</title>
+<meta name="description" content="Score sheet for the card game Rikiki: bids, tricks, points and past games.">
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,9 +36,18 @@ body{
 .disp{font-family:"Caveat","Bradley Hand","Segoe Script",cursive;font-weight:700;color:var(--ink);line-height:1}
 h1{font-size:54px}
 h2{font-size:32px;margin:28px 0 10px}
-.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .top .brand{font-size:26px}
+.top .sub{margin-left:auto}
 .sub{color:var(--ink-soft);font-size:15px}
+
+/* Language toggle. Same markup and key as the rest of the site, so the choice
+   carries between the index and every game on the origin. */
+.langbar{display:flex;border:1.5px solid var(--ink-soft);border-radius:999px;overflow:hidden;flex:none}
+.langbar button{appearance:none;border:0;background:transparent;color:var(--ink-soft);cursor:pointer;
+  font:700 12.5px/1 "Atkinson Hyperlegible",system-ui,sans-serif;letter-spacing:.06em;padding:8px 11px;min-height:34px;text-transform:uppercase}
+.langbar button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+
 .round{margin:14px 0 4px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .round .cards{font-size:64px}
 .round .meta{text-align:right;font-size:15px;color:var(--ink-soft)}
@@ -72,7 +81,6 @@ h2{font-size:32px;margin:28px 0 10px}
 .step button:active{background:var(--fill)}
 .step button:disabled{opacity:.25;cursor:default}
 .step .val{width:44px;text-align:center;font-size:40px}
-.step .val.forbidden{color:var(--red);text-decoration:line-through}
 .p2 .step .val{color:var(--red)}
 
 .status{margin:12px 2px;font-size:15px;min-height:22px}
@@ -127,15 +135,166 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
 .home{max-width:520px;margin:0 auto;padding:18px 16px calc(28px + env(safe-area-inset-bottom));text-align:center}
 .home a{color:var(--ink-soft);font-size:14px;text-decoration:none;border-bottom:1px dashed var(--ink-soft);padding-bottom:1px}
 </style>
+<script>
+/* Shared language runtime. The key is origin-wide, so choosing a language here
+   also changes the index and every other game. Kept inside the app rather than
+   injected at build time so that opening this file straight from a git clone
+   still works. */
+(function(){
+  var K='jnssn-lang', LANGS=['en','fr'], DEF='en';
+  function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
+  function initial(){
+    var s=stored(); if(LANGS.indexOf(s)>-1) return s;
+    var nav=(navigator.languages||[navigator.language||'']).join(',').toLowerCase();
+    for(var i=0;i<LANGS.length;i++) if(nav.indexOf(LANGS[i])>-1) return LANGS[i];
+    return DEF;
+  }
+  var cur=initial();
+  document.documentElement.lang=cur;
+  window.JLang={
+    langs:LANGS,
+    get:function(){ return cur; },
+    set:function(l){
+      if(LANGS.indexOf(l)<0||l===cur) return;
+      cur=l; document.documentElement.lang=l;
+      try{ localStorage.setItem(K,l); }catch(e){}
+      window.dispatchEvent(new CustomEvent('jlangchange',{detail:l}));
+    }
+  };
+})();
+</script>
 </head>
 <body>
 <main id="app"></main>
-<nav class="home"><a href="/">&larr; toutes les apps</a></nav>
+<nav class="home"><a href="/" id="homelink">&larr; all games</a></nav>
 <script>
 (function(){
   var KEY = 'rikiki-v1'; // unchanged so a game in progress survives updates
   var app = document.getElementById('app');
   var armed = false;
+
+  /* ---------- strings ----------
+     French plurals mark from 2 up ("0 carte", "1 carte", "2 cartes");
+     English from anything but 1 ("0 cards", "1 card", "2 cards"). Each
+     language therefore brings its own plural helper rather than sharing one. */
+  function fp(n, one, many){ return n+' '+(n>1?many:one); }
+  function ep(n, one, many){ return n+' '+(n===1?one:many); }
+
+  var L = {
+    fr: {
+      locale:'fr-BE', docTitle:'Rikiki, feuille de score', home:'← tous les jeux',
+      brandSub:'feuille de score', who:'Qui joue ?',
+      playerN:function(n){ return 'Joueur '+n; },
+      playerLabel:function(n){ return 'Nom du joueur '+n; },
+      removePlayer:'Retirer ce joueur',
+      dealOrder:'Le premier de la liste donne la première manche, puis ça tourne.',
+      addPlayer:'Ajouter un joueur', rules:'Règles de la partie',
+      maxCards:'Cartes au maximum',
+      roundsTotal:function(n){ return fp(n,'manche','manches')+' au total'; },
+      upDown:'Monter puis redescendre',
+      forbid:'Pari interdit pour le donneur',
+      forbidNote:'Le total des paris ne peut pas égaler le nombre de cartes',
+      ptsHit:'Points si pari réussi', ptsPer:'Points par pli gagné',
+      ptsPen:'Points perdus par pli d’écart',
+      start:'Commencer la partie', recent:'Dernières parties',
+      clear:'Effacer', confirm:'Confirmer',
+      localOnly:'Tout est enregistré sur cet appareil uniquement. Effacer les données du navigateur efface la partie et l’historique.',
+      noHistory:'Aucune partie enregistrée pour l’instant. Les 5 dernières s’affichent ici.',
+      stopped:' (arrêtée)',
+      roundOf:function(i,n){ return 'Manche '+i+' sur '+n; },
+      cards:function(n){ return fp(n,'carte','cartes'); },
+      tricks:function(n){ return fp(n,'pli','plis'); },
+      rounds:function(n){ return fp(n,'manche','manches'); },
+      deals:function(nm){ return '<b>'+nm+'</b> donne'; },
+      leads:function(nm){ return '<b>'+nm+'</b> commence'; },
+      phase1:'1. Annoncé', phase2:'2. Réalisé',
+      bidsLead:'Plis annoncés', tricksLead:'Plis réalisés',
+      banned:function(n){ return 'interdit : '+n; },
+      dealerFree:'donneur, tout est permis', dealerLast:'donneur, annonce en dernier',
+      totalBids:function(t,c){ return 'Total des paris : '+t+' pour '+c+'.'; },
+      totalBad:function(n,d){ return 'Le total ne peut pas faire '+n+'. '+d+' doit changer son pari.'; },
+      confirmBids:'Valider les annonces',
+      bidChip:function(n){ return 'annoncé '+n; },
+      pts:function(s){ return s+' pts'; },
+      countsOk:'Le compte est bon.',
+      needMore:function(d,c){ return 'Partez des annonces et corrigez. Encore '+d+' à attribuer sur '+c+'.'; },
+      tooMany:function(s){ return s+' en trop.'; },
+      confirmRound:'Valider la manche', theSheet:'La feuille',
+      latestTop:'Dernière manche en haut', firstTop:'Première manche en haut',
+      orderLabel:'Changer l’ordre des manches',
+      sheetEmpty:'Les manches jouées s’inscrivent ici. Sous chaque score : pari / plis faits.',
+      colRound:'Manche', goBack:'Revenir en arrière',
+      stopGame:'Arrêter la partie', confirmStop:'Confirmer : arrêter',
+      done:'Fini !', standings:'Classement',
+      again:'Rejouer avec les mêmes joueurs', fixLast:'Corriger la dernière manche',
+      changePlayers:'Changer les joueurs ou les règles',
+      less:'Moins', more:'Plus'
+    },
+    en: {
+      locale:'en-GB', docTitle:'Rikiki score sheet', home:'← all games',
+      brandSub:'score sheet', who:'Who plays?',
+      playerN:function(n){ return 'Player '+n; },
+      playerLabel:function(n){ return 'Player '+n+' name'; },
+      removePlayer:'Remove this player',
+      dealOrder:'The first name on the list deals the first round, then it rotates.',
+      addPlayer:'Add a player', rules:'Game rules',
+      maxCards:'Maximum cards',
+      roundsTotal:function(n){ return ep(n,'round','rounds')+' in total'; },
+      upDown:'Up then back down',
+      forbid:'Dealer bid restriction',
+      forbidNote:'The bids cannot add up to the number of cards',
+      ptsHit:'Points for a correct bid', ptsPer:'Points per trick won',
+      ptsPen:'Points lost per trick off',
+      start:'Start the game', recent:'Recent games',
+      clear:'Clear', confirm:'Confirm',
+      localOnly:'Everything is saved on this device only. Clearing browser data erases the game and the history.',
+      noHistory:'No games saved yet. The last 5 show up here.',
+      stopped:' (stopped)',
+      roundOf:function(i,n){ return 'Round '+i+' of '+n; },
+      cards:function(n){ return ep(n,'card','cards'); },
+      tricks:function(n){ return ep(n,'trick','tricks'); },
+      rounds:function(n){ return ep(n,'round','rounds'); },
+      deals:function(nm){ return '<b>'+nm+'</b> deals'; },
+      leads:function(nm){ return '<b>'+nm+'</b> leads'; },
+      phase1:'1. Bid', phase2:'2. Won',
+      bidsLead:'Tricks bid', tricksLead:'Tricks won',
+      banned:function(n){ return 'not allowed: '+n; },
+      dealerFree:'dealer, anything goes', dealerLast:'dealer, bids last',
+      totalBids:function(t,c){ return 'Bids total '+t+' for '+c+'.'; },
+      totalBad:function(n,d){ return 'The bids cannot total '+n+'. '+d+' must change their bid.'; },
+      confirmBids:'Confirm the bids',
+      bidChip:function(n){ return 'bid '+n; },
+      pts:function(s){ return s+' pts'; },
+      countsOk:'That adds up.',
+      needMore:function(d,c){ return 'Work from the bids and adjust. '+d+' still to assign out of '+c+'.'; },
+      tooMany:function(s){ return s+' too many.'; },
+      confirmRound:'Confirm the round', theSheet:'The sheet',
+      latestTop:'Latest round on top', firstTop:'First round on top',
+      orderLabel:'Change the round order',
+      sheetEmpty:'Rounds you have played appear here. Under each score: bid / tricks won.',
+      colRound:'Round', goBack:'Go back',
+      stopGame:'Stop the game', confirmStop:'Confirm: stop',
+      done:'Done!', standings:'Standings',
+      again:'Play again, same players', fixLast:'Fix the last round',
+      changePlayers:'Change the players or the rules',
+      less:'Minus', more:'Plus'
+    }
+  };
+  function D(){ return L[window.JLang ? window.JLang.get() : 'en'] || L.en; }
+  // t('key') for a plain string, t('key', a, b) for one that takes arguments.
+  function t(k){
+    var v = D()[k];
+    if(typeof v !== 'function') return v;
+    return v.apply(null, Array.prototype.slice.call(arguments, 1));
+  }
+
+  function langBar(){
+    var l = window.JLang;
+    if(!l || l.langs.length < 2) return '';
+    return '<div class="langbar" role="group" aria-label="Language">' + l.langs.map(function(c){
+      return '<button type="button" data-lang="'+c+'" aria-pressed="'+(c===l.get())+'">'+c+'</button>';
+    }).join('') + '</div>';
+  }
 
   function fresh(){
     return {phase:'setup', players:['','','',''],
@@ -178,28 +337,28 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
     try{ localStorage.setItem(HKEY, JSON.stringify(MEMH)); }catch(e){}
   }
   function when(ts){
-    try{ return new Date(ts).toLocaleString('fr-BE', {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}); }
+    try{ return new Date(ts).toLocaleString(t('locale'), {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}); }
     catch(e){ return new Date(ts).toDateString(); }
   }
   function viewHistory(){
     var inGame = S.phase!=='setup';
     var H = loadHistory().filter(function(g){ return !(inGame && g.id===S.id); });
-    var h = '<div class="sheethead"><h2 class="disp">Dernières parties</h2>'+(H.length?'<button class="mini danger" data-act="clearh">'+(armedH?'Confirmer':'Effacer')+'</button>':'')+'</div>'+
-            '<p class="sub" style="margin:0 2px 8px">Tout est enregistré sur cet appareil uniquement. Effacer les données du navigateur efface la partie et l’historique.</p>';
-    if(!H.length) return h + '<div class="sheet"><div class="empty">Aucune partie enregistrée pour l’instant. Les 5 dernières s’affichent ici.</div></div>';
+    var h = '<div class="sheethead"><h2 class="disp">'+t('recent')+'</h2>'+
+            (H.length?'<button class="mini danger" data-act="clearh">'+(armedH?t('confirm'):t('clear'))+'</button>':'')+'</div>'+
+            '<p class="sub" style="margin:0 2px 8px">'+t('localOnly')+'</p>';
+    if(!H.length) return h + '<div class="sheet"><div class="empty">'+t('noHistory')+'</div></div>';
     H.forEach(function(g){
-      var t = totals(g), order = g.players.map(function(_,i){return i;}).sort(function(a,b){ return t[b]-t[a]; });
-      var line = order.map(function(i){ return esc(g.players[i])+' '+t[i]; }).join(', ');
-      h += '<details class="past"><summary><span class="pd">'+esc(when(g.ts))+(g.finished?'':' (arrêtée)')+'</span><span class="pl">'+line+'</span></summary>'+
+      var tt = totals(g), order = g.players.map(function(_,i){return i;}).sort(function(a,b){ return tt[b]-tt[a]; });
+      var line = order.map(function(i){ return esc(g.players[i])+' '+tt[i]; }).join(', ');
+      h += '<details class="past"><summary><span class="pd">'+esc(when(g.ts))+(g.finished?'':t('stopped'))+'</span><span class="pl">'+line+'</span></summary>'+
            '<div class="sheet">'+tableBody(g, false)+'</div></details>';
     });
     return h;
   }
 
-  function esc(t){ return String(t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function esc(x){ return String(x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function sum(a){ return a.reduce(function(x,y){ return x+y; }, 0); }
   function sign(n){ return n>0 ? '+'+n : (n<0 ? '−'+Math.abs(n) : '0'); }
-  function plural(n, one, many){ return n+' '+(n>1?many:one); }
 
   function hardMax(n){ return Math.floor(52/n); }
   function autoMax(n){ return Math.min(10, Math.floor(51/n)); }
@@ -216,9 +375,9 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   function points(bid, made, cfg){ cfg = cfg || S.cfg; return bid===made ? cfg.bonus + cfg.per*made : -cfg.pen*Math.abs(bid-made); }
   function totals(g){
     g = g || S;
-    var t = g.players.map(function(){ return 0; });
-    g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ t[i] += points(b, r.made[i], g.cfg); }); });
-    return t;
+    var tt = g.players.map(function(){ return 0; });
+    g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ tt[i] += points(b, r.made[i], g.cfg); }); });
+    return tt;
   }
   function roundInfo(){
     var i = S.rounds.length, n = S.players.length, s = seq();
@@ -239,9 +398,9 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   function stepper(kind, i, v, min, max, skip){
     if(skip==null) skip = -99;
     return '<div class="step">'+
-      '<button data-act="dec" data-kind="'+kind+'" data-i="'+i+'" aria-label="Moins"'+(nextAllowed(v,-1,min,max,skip)==null?' disabled':'')+'>'+ICON_MINUS+'</button>'+
+      '<button data-act="dec" data-kind="'+kind+'" data-i="'+i+'" aria-label="'+esc(t('less'))+'"'+(nextAllowed(v,-1,min,max,skip)==null?' disabled':'')+'>'+ICON_MINUS+'</button>'+
       '<span class="val disp" aria-live="polite">'+v+'</span>'+
-      '<button data-act="inc" data-kind="'+kind+'" data-i="'+i+'" aria-label="Plus"'+(nextAllowed(v,1,min,max,skip)==null?' disabled':'')+'>'+ICON_PLUS+'</button>'+
+      '<button data-act="inc" data-kind="'+kind+'" data-i="'+i+'" aria-label="'+esc(t('more'))+'"'+(nextAllowed(v,1,min,max,skip)==null?' disabled':'')+'>'+ICON_PLUS+'</button>'+
     '</div>';
   }
   // The dealer's forbidden bid for the current round, or null when nothing is forbidden.
@@ -258,24 +417,25 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
 
   function viewSetup(){
     var n = S.players.length, h = '';
-    h += '<div class="top"><h1 class="disp">Rikiki</h1><span class="sub">feuille de score</span></div>';
-    h += '<h2 class="disp">Qui joue ?</h2><div class="sheet players">';
+    h += '<div class="top"><h1 class="disp">Rikiki</h1>'+langBar()+'</div>';
+    h += '<p class="sub" style="margin:6px 2px 0">'+t('brandSub')+'</p>';
+    h += '<h2 class="disp">'+t('who')+'</h2><div class="sheet players">';
     S.players.forEach(function(p,i){
-      h += '<div class="row"><input type="text" autocomplete="off" autocapitalize="words" maxlength="14" data-name="'+i+'" value="'+esc(p)+'" placeholder="Joueur '+(i+1)+'" aria-label="Nom du joueur '+(i+1)+'">'+
-        (n>2 ? '<button class="x" data-act="rm" data-i="'+i+'" aria-label="Retirer ce joueur">×</button>' : '')+'</div>';
+      h += '<div class="row"><input type="text" autocomplete="off" autocapitalize="words" maxlength="14" data-name="'+i+'" value="'+esc(p)+'" placeholder="'+esc(t('playerN',i+1))+'" aria-label="'+esc(t('playerLabel',i+1))+'">'+
+        (n>2 ? '<button class="x" data-act="rm" data-i="'+i+'" aria-label="'+esc(t('removePlayer'))+'">×</button>' : '')+'</div>';
     });
-    h += '</div><p class="sub" style="margin:10px 2px">Le premier de la liste donne la première manche, puis ça tourne.</p>';
-    if(n<7) h += '<div class="btns"><button class="btn ghost" data-act="add">Ajouter un joueur</button></div>';
+    h += '</div><p class="sub" style="margin:10px 2px">'+t('dealOrder')+'</p>';
+    if(n<7) h += '<div class="btns"><button class="btn ghost" data-act="add">'+t('addPlayer')+'</button></div>';
 
-    h += '<details'+(S.cfg._open?' open':'')+'><summary>Règles de la partie</summary><div class="sheet" style="margin-top:8px">';
-    h += '<div class="row opt"><div class="who"><div class="name">Cartes au maximum</div><div class="note">'+plural(seq().length,'manche','manches')+' au total</div></div>'+stepper('max',0,maxCards(),1,hardMax(n))+'</div>';
-    h += '<div class="row opt"><div class="who"><div class="name">Monter puis redescendre</div></div><button class="toggle" data-act="tog" data-k="down" aria-pressed="'+S.cfg.down+'" aria-label="Monter puis redescendre"></button></div>';
-    h += '<div class="row opt"><div class="who"><div class="name">Pari interdit pour le donneur</div><div class="note">Le total des paris ne peut pas égaler le nombre de cartes</div></div><button class="toggle" data-act="tog" data-k="forbid" aria-pressed="'+S.cfg.forbid+'" aria-label="Pari interdit pour le donneur"></button></div>';
-    h += '<div class="row opt"><div class="who"><div class="name">Points si pari réussi</div></div>'+stepper('bonus',0,S.cfg.bonus,0,50)+'</div>';
-    h += '<div class="row opt"><div class="who"><div class="name">Points par pli gagné</div></div>'+stepper('per',0,S.cfg.per,0,20)+'</div>';
-    h += '<div class="row opt"><div class="who"><div class="name">Points perdus par pli d’écart</div></div>'+stepper('pen',0,S.cfg.pen,0,20)+'</div>';
+    h += '<details'+(S.cfg._open?' open':'')+'><summary>'+t('rules')+'</summary><div class="sheet" style="margin-top:8px">';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('maxCards')+'</div><div class="note">'+t('roundsTotal',seq().length)+'</div></div>'+stepper('max',0,maxCards(),1,hardMax(n))+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('upDown')+'</div></div><button class="toggle" data-act="tog" data-k="down" aria-pressed="'+S.cfg.down+'" aria-label="'+esc(t('upDown'))+'"></button></div>';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('forbid')+'</div><div class="note">'+t('forbidNote')+'</div></div><button class="toggle" data-act="tog" data-k="forbid" aria-pressed="'+S.cfg.forbid+'" aria-label="'+esc(t('forbid'))+'"></button></div>';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('ptsHit')+'</div></div>'+stepper('bonus',0,S.cfg.bonus,0,50)+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('ptsPer')+'</div></div>'+stepper('per',0,S.cfg.per,0,20)+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">'+t('ptsPen')+'</div></div>'+stepper('pen',0,S.cfg.pen,0,20)+'</div>';
     h += '</div></details>';
-    h += '<div class="btns" style="margin-top:22px"><button class="btn" data-act="start">Commencer la partie</button></div>';
+    h += '<div class="btns" style="margin-top:22px"><button class="btn" data-act="start">'+t('start')+'</button></div>';
     h += viewHistory();
     return h;
   }
@@ -283,24 +443,24 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   function viewTable(){
     var h = '';
     var stack = S.cfg.stack !== false;
-    h += '<div class="sheethead"><h2 class="disp">La feuille</h2>'+
-         (S.rounds.length>1 ? '<button class="mini" data-act="order" aria-label="Changer l’ordre des manches">'+(stack?'Dernière manche en haut':'Première manche en haut')+' ⇅</button>' : '')+
+    h += '<div class="sheethead"><h2 class="disp">'+t('theSheet')+'</h2>'+
+         (S.rounds.length>1 ? '<button class="mini" data-act="order" aria-label="'+esc(t('orderLabel'))+'">'+(stack?t('latestTop'):t('firstTop'))+' ⇅</button>' : '')+
          '</div><div class="sheet">';
-    if(!S.rounds.length) return h + '<div class="empty">Les manches jouées s’inscrivent ici. Sous chaque score : pari / plis faits.</div></div>';
+    if(!S.rounds.length) return h + '<div class="empty">'+t('sheetEmpty')+'</div></div>';
     return h + tableBody(S, stack) + '</div>';
   }
   function tableBody(g, stack){
-    var t = totals(g), best = Math.max.apply(null, t), h = '';
-    h += '<div class="scroll"><table><thead><tr><th scope="col">Manche</th>';
+    var tt = totals(g), best = Math.max.apply(null, tt), h = '';
+    h += '<div class="scroll"><table><thead><tr><th scope="col">'+t('colRound')+'</th>';
     g.players.forEach(function(p,i){
-      h += '<th scope="col" class="'+(t[i]===best?'first':'')+'">'+esc(p)+'<span class="tot disp'+(t[i]<0?' neg':'')+'">'+t[i]+'</span></th>';
+      h += '<th scope="col" class="'+(tt[i]===best?'first':'')+'">'+esc(p)+'<span class="tot disp'+(tt[i]<0?' neg':'')+'">'+tt[i]+'</span></th>';
     });
     h += '</tr></thead><tbody>';
     var list = g.rounds.map(function(r,k){ return {r:r,k:k}; });
     if(stack) list.reverse();
     list.forEach(function(o){
       var r = o.r;
-      h += '<tr><td>'+(o.k+1)+'<span class="bm">'+plural(r.cards,'carte','cartes')+'</span></td>';
+      h += '<tr><td>'+(o.k+1)+'<span class="bm">'+t('cards',r.cards)+'</span></td>';
       r.bids.forEach(function(b,i){
         var d = points(b, r.made[i], g.cfg);
         h += '<td><span class="d'+(d<0?' neg':'')+'">'+sign(d)+'</span><span class="bm">'+b+' / '+r.made[i]+'</span></td>';
@@ -311,7 +471,7 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   }
 
   function phases(now){
-    var names = ['1. Annoncé','2. Réalisé'], idx = {bids:0, tricks:1}[now], h = '<ol class="phases'+(idx===1?' p2':'')+'">';
+    var names = [t('phase1'), t('phase2')], idx = {bids:0, tricks:1}[now], h = '<ol class="phases'+(idx===1?' p2':'')+'">';
     names.forEach(function(nm,k){ h += '<li class="'+(k<idx?'done':k===idx?'now':'')+'"'+(k===idx?' aria-current="step"':'')+'>'+nm+'</li>'; });
     return h + '</ol>';
   }
@@ -319,9 +479,9 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   function viewGame(){
     var R = roundInfo(), c = S.cur, ph = S.phase, h = '';
     var dealer = esc(S.players[R.dealer]), first = esc(S.players[R.order[0]]);
-    h += '<div class="top"><span class="disp brand">Rikiki</span><span class="sub">Manche '+(R.idx+1)+' sur '+R.count+'</span></div>';
-    h += '<div class="round"><div class="cards disp">'+plural(R.cards,'carte','cartes')+'</div>'+
-         '<div class="meta"><b>'+dealer+'</b> donne<br><b>'+first+'</b> commence</div></div>';
+    h += '<div class="top"><span class="disp brand">Rikiki</span><span class="sub">'+t('roundOf',R.idx+1,R.count)+'</span>'+langBar()+'</div>';
+    h += '<div class="round"><div class="cards disp">'+t('cards',R.cards)+'</div>'+
+         '<div class="meta">'+t('deals',dealer)+'<br>'+t('leads',first)+'</div></div>';
     h += phases(ph);
 
     var totalBids = sum(c.bids), ok = true, msg = '', mcls = '', cta = '', act = '';
@@ -330,62 +490,65 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
       fixDealer(R);
       totalBids = sum(c.bids);
       var forbidden = forbiddenBid(R);
-      h += '<p class="lead disp">Plis annoncés</p><div class="sheet">';
+      h += '<p class="lead disp">'+t('bidsLead')+'</p><div class="sheet">';
       R.order.forEach(function(i){
         var note = '', isDealer = i===R.dealer;
         if(isDealer && S.cfg.forbid){
-          note = forbidden!=null ? '<span class="ban">interdit : '+forbidden+'</span>' : '<span class="free">donneur, tout est permis</span>';
-        }else if(isDealer){ note = 'donneur, annonce en dernier'; }
+          note = forbidden!=null ? '<span class="ban">'+t('banned',forbidden)+'</span>' : '<span class="free">'+t('dealerFree')+'</span>';
+        }else if(isDealer){ note = t('dealerLast'); }
         h += '<div class="row'+(isDealer?' dealer':'')+'"><div class="who"><div class="name">'+esc(S.players[i])+'</div><div class="note">'+note+'</div></div>'+stepper('bid',i,c.bids[i],0,R.cards,isDealer?forbidden:null)+'</div>';
       });
       h += '</div>';
       ok = !(S.cfg.forbid && totalBids===R.cards);
-      msg = ok ? 'Total des paris : '+totalBids+' pour '+plural(R.cards,'carte','cartes')+'.' : 'Le total ne peut pas faire '+R.cards+'. '+dealer+' doit changer son pari.';
+      msg = ok ? t('totalBids', totalBids, t('cards',R.cards)) : t('totalBad', R.cards, dealer);
       if(!ok) mcls='bad';
-      cta = 'Valider les annonces'; act = 'lock';
+      cta = t('confirmBids'); act = 'lock';
     }
     else{
       var made = sum(c.made), diff = R.cards - made; ok = diff===0;
-      h += '<p class="lead disp">Plis réalisés</p><div class="sheet p2">';
+      h += '<p class="lead disp">'+t('tricksLead')+'</p><div class="sheet p2">';
       R.order.forEach(function(i){
         var p = points(c.bids[i], c.made[i]);
-        var res = '<span class="note '+(p<0?'bad':'good')+'">'+sign(p)+' pts</span>';
-        h += '<div class="row"><div class="who"><div class="name">'+esc(S.players[i])+'</div><div class="note"><span class="chip">annoncé '+c.bids[i]+'</span>'+res+'</div></div>'+stepper('made',i,c.made[i],0,R.cards)+'</div>';
+        var res = '<span class="note '+(p<0?'bad':'good')+'">'+t('pts',sign(p))+'</span>';
+        h += '<div class="row"><div class="who"><div class="name">'+esc(S.players[i])+'</div><div class="note"><span class="chip">'+t('bidChip',c.bids[i])+'</span>'+res+'</div></div>'+stepper('made',i,c.made[i],0,R.cards)+'</div>';
       });
       h += '</div>';
-      msg = ok ? 'Le compte est bon.' : (diff>0 ? 'Partez des annonces et corrigez. Encore '+plural(diff,'pli','plis')+' à attribuer sur '+R.cards+'.' : plural(-diff,'pli','plis')+' en trop.');
+      msg = ok ? t('countsOk') : (diff>0 ? t('needMore', t('tricks',diff), t('cards',R.cards)) : t('tooMany', t('tricks',-diff)));
       mcls = ok ? 'ok' : 'bad';
-      cta = 'Valider la manche'; act = 'score';
+      cta = t('confirmRound'); act = 'score';
     }
 
     if(msg) h += '<p class="status '+mcls+'" role="status">'+msg+'</p>';
     h += '<div class="btns"><button class="btn" data-act="'+act+'"'+(ok?'':' disabled')+'>'+cta+'</button></div>';
     h += viewTable();
     h += '<div class="btns two" style="margin-top:16px">'+
-         '<button class="btn ghost" data-act="back"'+((ph==='bids' && !S.rounds.length)?' disabled':'')+'>Revenir en arrière</button>'+
-         '<button class="btn danger" data-act="quit">'+(armed?'Confirmer : arrêter':'Arrêter la partie')+'</button></div>';
+         '<button class="btn ghost" data-act="back"'+((ph==='bids' && !S.rounds.length)?' disabled':'')+'>'+t('goBack')+'</button>'+
+         '<button class="btn danger" data-act="quit">'+(armed?t('confirmStop'):t('stopGame'))+'</button></div>';
     h += viewHistory();
     return h;
   }
 
   function viewDone(){
-    var t = totals(), order = S.players.map(function(_,i){return i;}).sort(function(a,b){ return t[b]-t[a]; }), h = '';
-    h += '<div class="top"><h1 class="disp">Fini !</h1><span class="sub">'+plural(S.rounds.length,'manche','manches')+'</span></div>';
-    h += '<h2 class="disp">Classement</h2><div class="sheet podium">';
+    var tt = totals(), order = S.players.map(function(_,i){return i;}).sort(function(a,b){ return tt[b]-tt[a]; }), h = '';
+    h += '<div class="top"><h1 class="disp">'+t('done')+'</h1>'+langBar()+'</div>';
+    h += '<p class="sub" style="margin:6px 2px 0">'+t('rounds',S.rounds.length)+'</p>';
+    h += '<h2 class="disp">'+t('standings')+'</h2><div class="sheet podium">';
     var rank = 0, prev = null;
     order.forEach(function(i,k){
-      if(t[i]!==prev){ rank = k+1; prev = t[i]; }
-      h += '<div class="row"><span class="rank disp">'+rank+'</span><div class="who"><div class="name">'+esc(S.players[i])+'</div></div><span class="pts disp'+(t[i]<0?' neg':'')+'">'+t[i]+'</span></div>';
+      if(tt[i]!==prev){ rank = k+1; prev = tt[i]; }
+      h += '<div class="row"><span class="rank disp">'+rank+'</span><div class="who"><div class="name">'+esc(S.players[i])+'</div></div><span class="pts disp'+(tt[i]<0?' neg':'')+'">'+tt[i]+'</span></div>';
     });
     h += '</div>' + viewTable();
-    h += '<div class="btns" style="margin-top:18px"><button class="btn" data-act="again">Rejouer avec les mêmes joueurs</button>'+
-         '<button class="btn ghost" data-act="back">Corriger la dernière manche</button>'+
-         '<button class="btn ghost" data-act="setup">Changer les joueurs ou les règles</button></div>';
+    h += '<div class="btns" style="margin-top:18px"><button class="btn" data-act="again">'+t('again')+'</button>'+
+         '<button class="btn ghost" data-act="back">'+t('fixLast')+'</button>'+
+         '<button class="btn ghost" data-act="setup">'+t('changePlayers')+'</button></div>';
     h += viewHistory();
     return h;
   }
 
   function render(){
+    document.title = t('docTitle');
+    document.getElementById('homelink').innerHTML = t('home');
     app.innerHTML = S.phase==='setup' ? viewSetup() : S.phase==='done' ? viewDone() : viewGame();
     save();
   }
@@ -416,7 +579,13 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
     if(e.target.tagName==='DETAILS' && !e.target.classList.contains('past')){ S.cfg._open = e.target.open; save(); }
   }, true);
 
+  // Re-render in the new language, keeping the game exactly where it was.
+  window.addEventListener('jlangchange', render);
+
   document.addEventListener('click', function(e){
+    var lb = e.target.closest && e.target.closest('[data-lang]');
+    if(lb){ if(window.JLang) window.JLang.set(lb.getAttribute('data-lang')); return; }
+
     var b = e.target.closest && e.target.closest('[data-act]');
     if(!b || b.disabled) return;
     var act = b.getAttribute('data-act'), i = +b.getAttribute('data-i'), top = false;
@@ -431,7 +600,7 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
       case 'order': S.cfg.stack = (S.cfg.stack === false); break;
       case 'tog': var k = b.getAttribute('data-k'); S.cfg[k] = !S.cfg[k]; break;
       case 'start':
-        S.players = S.players.map(function(p,j){ return p.trim() || 'Joueur '+(j+1); });
+        S.players = S.players.map(function(p,j){ return p.trim() || t('playerN', j+1); });
         S.cfg.max = maxCards(); S.rounds = []; S.cur = newCur(); S.phase = 'bids'; S.id = 'g'+Date.now(); top = true; break;
       case 'lock': S.cur.made = S.cur.bids.slice(); S.phase = 'tricks'; top = true; break;
       case 'score':

@@ -1,7 +1,7 @@
 # mini-games — a phone-driven static app platform
 
-Small self-contained browser apps, one directory each, published to
-**https://apps.jnssn.io/&lt;slug&gt;/** by Cloudflare Pages on every push to `main`.
+Small self-contained browser games, one directory each, published to
+**https://games.jnssn.io/&lt;slug&gt;/** by Cloudflare Pages on every push to `main`.
 
 Antoine works from an iPhone. Every routine operation here must be doable by
 sending a message in a remote session — never assume a laptop, a terminal, or a
@@ -13,11 +13,13 @@ local checkout.
 
 ```
 apps/<slug>/index.html     one self-contained app, single file, no siblings
-apps/<slug>/meta.json      title, description, created date, icon
+apps/<slug>/meta.json      title, description, languages, created date
 config/apps.json           single source of truth for routing and flags
 site/index.html            GENERATED landing page — never hand-edit
 scripts/build.mjs          generates site/index.html and dist/
+scripts/icon.mjs           generates home-screen icons as PNGs, no dependencies
 dist/                      GENERATED deploy output — git-ignored
+.claude/settings.json      points at the anjansse/claude-skills marketplace
 .claude/skills/new-app/    skill that scaffolds a new app
 ```
 
@@ -38,33 +40,95 @@ Unknown paths get `dist/404.html`, which links back to the index.
 
 ## App conventions
 
-Every app is validated by the build; a violation fails the build rather than
-shipping a broken page. An app must:
+How to write the file itself — the single-file rule, guarded `localStorage`,
+light/dark tokens, phone layout, i18n, service workers — lives in the
+**`self-contained-html`** skill, from the `self-contained-web` plugin in
+[anjansse/claude-skills](https://github.com/anjansse/claude-skills). Read it
+before writing an app. What follows is only what this repo enforces.
 
-1. Be **one file**, `apps/<slug>/index.html`. No sibling assets — inline CSS,
-   JS, SVG and small images (data URIs). `meta.json` is the only other file.
-2. Use **no Claude-runtime APIs**: `window.claude`, `claude.use(...)`,
-   `window.storage`, `api.anthropic.com`. They only exist inside a Claude
-   artifact and are dead code here.
-3. Reference **no external hosts** except `cdnjs.cloudflare.com` (scripts) and
-   `fonts.googleapis.com` / `fonts.gstatic.com` (stylesheets). Prefer inlining.
-4. Be **responsive** — a `viewport` meta tag, a phone-width layout, tap targets
-   ~44px or larger.
-5. Respect **`prefers-color-scheme`**, with the light/dark token pattern used in
-   `apps/rikiki/index.html`.
-6. Keep state in **`localStorage` only**, every access wrapped in `try`/`catch`.
-   It can throw or return empty in private browsing or with site data cleared;
-   the app must still work. State is per-device and never syncs.
-7. Have a `<a href="/">` link back to the index.
+The build validates every app and fails rather than shipping a broken page:
+
+1. **One file**, `apps/<slug>/index.html`. No sibling assets. `meta.json` is the
+   only other file in the directory.
+2. **No Claude-runtime APIs**: `window.claude`, `claude.use(...)`,
+   `window.storage`, `api.anthropic.com`.
+3. **No external hosts** except `cdnjs.cloudflare.com` and
+   `fonts.googleapis.com` / `fonts.gstatic.com`.
+4. A **`viewport`** meta tag.
+5. **`prefers-color-scheme`** support.
+6. Literal **`</head>` and `</body>`** tags — the build injects the PWA plumbing
+   at those points.
+7. If `meta.json` declares more than one language, the app must use the shared
+   **`jnssn-lang`** runtime, or the site-wide toggle cannot reach it.
 
 Slugs: lowercase, digits, single hyphens (`^[a-z0-9]+(-[a-z0-9]+)*$`).
-`index`, `assets`, `404`, `_headers`, `_redirects` are reserved.
+Reserved: `index`, `assets`, `404`, `sw`, `offline`, `manifest`, `icon`,
+`_headers`, `_redirects`.
+
+## Languages
+
+The site is English and French. `config/apps.json` sets `site.languages` and
+`site.defaultLanguage`; any user-facing string in `config/apps.json` or a
+`meta.json` is either a plain string or an object keyed by language:
+
+```json
+"title": { "en": "Games", "fr": "Jeux" }
+```
+
+A missing translation warns and falls back to the default language.
+
+The chosen language is stored under the origin-wide key **`jnssn-lang`**, so
+switching it anywhere — the index or any game — applies everywhere. The initial
+value comes from that key, then `navigator.languages`, then the default.
+
+The landing page renders every language as sibling elements and hides the
+non-matching ones in CSS. It hides `[data-l]:not([data-l="<lang>"])` rather than
+hiding all and revealing the match, because `display:revert` would reset the
+element to the UA default and discard rules like `.t{display:block}`.
+
+Apps carry their own copy of the language runtime rather than having it
+injected, so that opening `apps/<slug>/index.html` from a git clone still works.
+
+## Offline and Add to Home Screen
+
+Every page is covered by a service worker at `/sw.js`, generated by the build:
+
+- **Network-first for pages**, so a deploy is live immediately and the cache
+  only rescues a request the network could not answer. A stale cached page on a
+  phone is very hard to clear, which is why this is not stale-while-revalidate.
+- **Cache-first for icons, manifests and fonts**, which never change under a
+  given URL.
+- The cache name is a hash of the deployed bytes. A deploy that changes nothing
+  leaves caches alone; one that changes anything invalidates them, and
+  `activate` deletes every other cache.
+- `caches.addAll` **rejects if the precache list contains a duplicate URL**, and
+  that one duplicate fails the whole install and leaves the site uncached. The
+  build deduplicates the list. Do not remove that.
+
+Each app also gets a web app manifest (`display: standalone`) and PNG icons
+generated from its slug by `scripts/icon.mjs`. The icons are PNG rather than SVG
+because **iOS ignores SVG for `apple-touch-icon`** and falls back to a
+screenshot of the page.
+
+Add to Home Screen from Safari gives a real offline app. Installed web apps are
+also exempt from iOS's 7-day storage eviction, so saved games survive there when
+they would not in a plain tab.
+
+There is **no way to import an HTML file into the Claude app as an artifact**.
+Artifacts are created by Claude in a conversation, and re-creating one needs
+network, which defeats the purpose. Add to Home Screen is the offline story.
 
 ## config/apps.json
 
 ```json
 {
-  "site": { "title": "...", "tagline": "...", "domain": "apps.jnssn.io" },
+  "site": {
+    "title": { "en": "Games", "fr": "Jeux" },
+    "tagline": { "en": "...", "fr": "..." },
+    "domain": "games.jnssn.io",
+    "languages": ["en", "fr"],
+    "defaultLanguage": "en"
+  },
   "apps": [ { "slug": "rikiki", "enabled": true } ]
 }
 ```
@@ -92,7 +156,7 @@ Cloudflare Pages project `mini-games`, connected to this repo.
 | Build command | `node scripts/build.mjs` |
 | Build output directory | `dist` |
 | Root directory | *(blank)* |
-| Custom domain | `apps.jnssn.io` |
+| Custom domain | `games.jnssn.io` |
 
 Push to `main` → Pages builds and deploys. **Roughly 30–60 seconds** from push
 to live, plus a few seconds of CDN propagation. Pushes to any other branch get a
@@ -122,8 +186,21 @@ it instant would need, all on free tiers:
 
 Cost: £0 (KV free tier is 100k reads/day; Pages Functions 100k req/day). The
 real cost is complexity — every request becomes dynamic, caching gets weaker,
-and a Function bug takes the whole site down rather than one app. Not worth it
-until toggling becomes frequent and latency-sensitive. Revisit if that happens.
+the service worker's network-first story gets murkier, and a Function bug takes
+the whole site down rather than one app. Not worth it until toggling becomes
+frequent and latency-sensitive.
+
+## Shared skills
+
+Generic, repo-independent skills live in
+[anjansse/claude-skills](https://github.com/anjansse/claude-skills), consumed as
+a **plugin marketplace** and wired up in `.claude/settings.json`. Not a
+submodule: there is no pointer to bump, nothing extra to clone, and nothing that
+can fail a Pages build.
+
+`new-app` stays here, because it is entirely about this repo — slugs,
+`config/apps.json`, the build, the commit convention. Only the craft of writing
+a single-file app is shared.
 
 ## Commits
 
@@ -162,14 +239,17 @@ The only record this project needs:
 
 | Name | Type | Value | Proxy |
 | --- | --- | --- | --- |
-| `apps` | CNAME | `mini-games.pages.dev` | Proxied |
+| `games` | CNAME | `mini-games.pages.dev` | Proxied |
 
-`apps` is its own label and cannot collide with the mail records: the MX and SPF
-records sit at the zone apex (`jnssn.io`), and DKIM sits at
-`sig1._domainkey`. A CNAME at `apps` does not shadow the apex and does not
-affect mail routing. Adding `apps.jnssn.io` as a Pages custom domain normally
+`games` is its own label and cannot collide with the mail records: the MX and
+SPF records sit at the zone apex (`jnssn.io`), and DKIM sits at
+`sig1._domainkey`. A CNAME at `games` does not shadow the apex and does not
+affect mail routing. Adding `games.jnssn.io` as a Pages custom domain normally
 creates this record automatically, since the zone is in the same Cloudflare
 account.
+
+The site previously lived at `apps.jnssn.io`. That custom domain and its DNS
+record were retired; the same reasoning applies to any future label.
 
 Verify mail records are intact at any time:
 
@@ -203,11 +283,18 @@ The build warns `apps/<slug>/ is not listed in config/apps.json`. Register it.
 
 **Deploy succeeds but shows the "switched off" page** — `enabled` is `false`.
 
-**Deploy succeeds but the page is stale** — hard-refresh; HTML is sent
-`must-revalidate` but iOS Safari caches aggressively. Add `?v=2` to confirm.
+**Deploy succeeds but the page is stale** — pages are network-first, so this
+should not happen once online. If it persists, the service worker is stuck:
+Safari → Settings → Advanced → Website Data → remove `games.jnssn.io`, which
+drops the cache and the registration. Saved games are removed with it, so only
+do this when something is genuinely broken.
 
-**`apps.jnssn.io` does not resolve / SSL error** — the custom domain is not
+**An app works online but not offline** — the service worker failed to install.
+Almost always `caches.addAll` rejecting: a precached URL 404s, or the list
+contains a duplicate. Check `dist/sw.js`'s `PRECACHE` against `dist/`.
+
+**`games.jnssn.io` does not resolve / SSL error** — the custom domain is not
 attached, or the certificate is still issuing (up to ~15 minutes on first
 setup). Check Pages → `mini-games` → Custom domains.
 
-**Never** "fix" a deploy by touching DNS records other than `apps`.
+**Never** "fix" a deploy by touching DNS records other than `games`.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>jnssn.io apps</title>
+<title>Games</title>
 <meta name="description" content="Small self-contained things, made on a phone.">
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,15 +16,16 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--pencil);background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px;min-height:100vh;line-height:1.45;font-size:16px;-webkit-tap-highlight-color:transparent}
-.wrap{max-width:520px;margin:0 auto;padding:calc(28px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
+.wrap{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
 .disp{font-family:"Caveat","Bradley Hand","Segoe Script",cursive;font-weight:700;color:var(--ink);line-height:1}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 h1{font-size:52px}
 .tagline{color:var(--ink-soft);font-size:16px;margin:8px 2px 26px}
 .sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
 a.card{display:flex;align-items:center;gap:14px;padding:16px 14px;border-top:1px solid var(--grid);text-decoration:none;color:inherit}
 a.card:first-child{border-top:0}
 a.card:active{background:var(--fill)}
-.icon{font-size:26px;width:34px;text-align:center;flex:none;line-height:1}
+.ic{width:38px;height:38px;border-radius:9px;flex:none}
 .body{min-width:0;flex:1}
 .t{display:block;font-weight:700;font-size:18px;color:var(--ink);line-height:1.25}
 .d{display:block;font-size:14px;color:var(--ink-soft);margin-top:3px;line-height:1.35}
@@ -35,21 +36,74 @@ a.card:active{background:var(--fill)}
 .mid h1{font-size:46px}
 .mid p{margin:16px auto 0;max-width:34ch;color:var(--ink-soft)}
 .back{display:inline-block;margin-top:26px;border:1.5px solid var(--ink);border-radius:6px;padding:13px 22px;color:var(--ink);text-decoration:none;font-weight:700}
-a:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+a:focus-visible,button:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+/* Hide only the variants that do NOT match the current language. Revealing a
+   match with display:revert would reset it to the UA default and discard the
+   author's own display rule, e.g. .t{display:block}. */
+html[lang="en"] [data-l]:not([data-l="en"]){display:none}
+html[lang="fr"] [data-l]:not([data-l="fr"]){display:none}
+.langbar{display:flex;gap:0;border:1.5px solid var(--ink-soft);border-radius:999px;overflow:hidden;flex:none}
+.langbar button{appearance:none;border:0;background:transparent;color:var(--ink-soft);cursor:pointer;
+  font:700 12.5px/1 system-ui,sans-serif;letter-spacing:.06em;padding:8px 11px;min-height:34px;text-transform:uppercase}
+.langbar button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
 </style>
+<script>
+(function(){
+  var K='jnssn-lang', LANGS=["en","fr"], DEF="en";
+  function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
+  function initial(){
+    var s=stored(); if(LANGS.indexOf(s)>-1) return s;
+    var nav=(navigator.languages||[navigator.language||'']).join(',').toLowerCase();
+    for(var i=0;i<LANGS.length;i++) if(nav.indexOf(LANGS[i])>-1) return LANGS[i];
+    return DEF;
+  }
+  var cur=initial();
+  document.documentElement.lang=cur;
+  window.JLang={
+    langs:LANGS,
+    get:function(){ return cur; },
+    set:function(l){
+      if(LANGS.indexOf(l)<0||l===cur) return;
+      cur=l; document.documentElement.lang=l;
+      try{ localStorage.setItem(K,l); }catch(e){}
+      window.dispatchEvent(new CustomEvent('jlangchange',{detail:l}));
+    }
+  };
+})();
+</script>
 </head>
 <body>
 <main class="wrap">
-<h1 class="disp">jnssn.io apps</h1>
-<p class="tagline">Small self-contained things, made on a phone.</p>
+<div class="head">
+  <h1 class="disp"><span data-l="en">Games</span><span data-l="fr">Jeux</span></h1>
+  <div id="langslot"></div>
+</div>
+<p class="tagline"><span data-l="en">Small self-contained things, made on a phone.</span><span data-l="fr">De petites choses autonomes, faites au téléphone.</span></p>
 <div class="sheet">
   <a class="card" href="/rikiki/">
-    <span class="icon" aria-hidden="true">♠</span>
-    <span class="body"><span class="t">Rikiki</span><span class="d">Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.</span></span>
+    <img class="ic" src="/rikiki/icon-192.png" alt="" width="38" height="38" loading="lazy">
+    <span class="body"><span data-l="en" class="t">Rikiki</span><span data-l="fr" class="t">Rikiki</span><span data-l="en" class="d">Score sheet for the card game Rikiki: bids, tricks, points and past games.</span><span data-l="fr" class="d">Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.</span></span>
     <span class="arrow" aria-hidden="true">→</span>
   </a>
 </div>
-<p class="note">Everything here runs entirely in your browser. Nothing you type leaves the device.</p>
+<p class="note"><span data-l="en">Everything here runs entirely in your browser. Nothing you type leaves the device. Add a game to your Home Screen and it works with no signal.</span><span data-l="fr">Tout fonctionne entièrement dans votre navigateur. Rien de ce que vous tapez ne quitte l’appareil. Ajoutez un jeu à l’écran d’accueil et il marche sans réseau.</span></p>
 </main>
+<script>
+function langBar(){
+  var l=window.JLang; if(!l||l.langs.length<2) return '';
+  return '<div class="langbar" role="group" aria-label="Language">'+l.langs.map(function(c){
+    return '<button type="button" data-lang="'+c+'" aria-pressed="'+(c===l.get())+'">'+c+'</button>';
+  }).join('')+'</div>';
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-lang]');
+  if(b&&window.JLang) window.JLang.set(b.getAttribute('data-lang'));
+});
+(function(){
+  var slot=document.getElementById('langslot');
+  if(slot) slot.innerHTML=langBar();
+  window.addEventListener('jlangchange',function(){ if(slot) slot.innerHTML=langBar(); });
+})();
+</script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "jnssn": {
+      "source": { "source": "github", "repo": "anjansse/claude-skills" }
+    }
+  },
+  "enabledPlugins": {
+    "self-contained-web@jnssn": true
+  }
+}

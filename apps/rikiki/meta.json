@@ -1,7 +1,10 @@
 {
-  "title": "Rikiki",
-  "description": "Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.",
-  "lang": "fr",
+  "title": { "en": "Rikiki", "fr": "Rikiki" },
+  "description": {
+    "en": "Score sheet for the card game Rikiki: bids, tricks, points and past games.",
+    "fr": "Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties."
+  },
+  "languages": ["en", "fr"],
   "created": "2026-09-20",
   "icon": "♠",
   "notes": "Migrated from a Claude artifact. The artifact's cross-device backup (window.claude db/user capabilities) was removed; state is localStorage-only."
