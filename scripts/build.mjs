@@ -19,7 +19,11 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { iconSet, themeColor, GLYPHS, GLYPH_NAMES, defaultGlyph } from './icon.mjs';
-import { syncSource, isCurrent, uiVersion } from './ui.mjs';
+import { syncSource, isCurrent, uiVersion, tokens, UI_CSS, FONT_LINK } from './ui.mjs';
+
+// The kit's own chevron, so the index points the same way a game does.
+const ARROW = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
+  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK_ONLY = process.argv.includes('--check');
@@ -218,70 +222,62 @@ const LANG_RUNTIME = `
   };
 })();`.trim();
 
-// Rendered by each page; the runtime above keeps the pressed state in sync.
-const LANG_TOGGLE_CSS = `
-.langbar{display:flex;gap:0;border:1.5px solid var(--ink-soft);border-radius:999px;overflow:hidden;flex:none}
-.langbar button{appearance:none;border:0;background:transparent;color:var(--ink-soft);cursor:pointer;
-  font:700 12.5px/1 system-ui,sans-serif;letter-spacing:.06em;padding:8px 11px;min-height:34px;text-transform:uppercase}
-.langbar button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
-`.trim();
-
+// The language toggle is the kit's segmented control, so it is the same object
+// here and inside every game.
 const LANG_TOGGLE_JS = `
 function langBar(){
   var l=window.JLang; if(!l||l.langs.length<2) return '';
-  return '<div class="langbar" role="group" aria-label="Language">'+l.langs.map(function(c){
+  return l.langs.map(function(c){
     return '<button type="button" data-lang="'+c+'" aria-pressed="'+(c===l.get())+'">'+c+'</button>';
-  }).join('')+'</div>';
+  }).join('');
 }
 document.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('[data-lang]');
   if(b&&window.JLang) window.JLang.set(b.getAttribute('data-lang'));
 });`.trim();
 
+// The shell runs on the same kit as the games, so the index and the game it
+// opens are visibly one product. It carries no slug, so it takes the default
+// hue; each game's own accent comes from its own slug.
 const SHELL_CSS = `
-:root{--paper:#FBFBF6;--grid:#D9E4F2;--ink:#1B3A9C;--ink-soft:#5B6FA8;--red:#C4202B;--pencil:#3A3D45;--fill:#EAF0FB;--on-ink:#fff}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0F1626;--grid:#1B2740;--ink:#AFC4FF;--ink-soft:#7F93C8;--red:#FF7B7B;--pencil:#E4E8F2;--fill:#18233C;--on-ink:#0F1626}}
-:root[data-theme="dark"]{--paper:#0F1626;--grid:#1B2740;--ink:#AFC4FF;--ink-soft:#7F93C8;--red:#FF7B7B;--pencil:#E4E8F2;--fill:#18233C;--on-ink:#0F1626}
-*{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
-body{font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--pencil);background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px;min-height:100vh;line-height:1.45;font-size:16px;-webkit-tap-highlight-color:transparent}
-.wrap{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
-.disp{font-family:"Caveat","Bradley Hand","Segoe Script",cursive;font-weight:700;color:var(--ink);line-height:1}
-.head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-h1{font-size:52px}
-.tagline{color:var(--ink-soft);font-size:16px;margin:8px 2px 26px}
-.sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
-a.card{display:flex;align-items:center;gap:14px;padding:16px 14px;border-top:1px solid var(--grid);text-decoration:none;color:inherit}
-a.card:first-child{border-top:0}
-a.card:active{background:var(--fill)}
-.ic{width:38px;height:38px;border-radius:9px;flex:none}
-.body{min-width:0;flex:1}
-.t{display:block;font-weight:700;font-size:18px;color:var(--ink);line-height:1.25}
-.d{display:block;font-size:14px;color:var(--ink-soft);margin-top:3px;line-height:1.35}
-.arrow{color:var(--ink-soft);font-size:20px;flex:none}
-.empty{padding:22px 16px;color:var(--ink-soft)}
-.find{width:100%;margin:0 0 14px;padding:13px 14px;border:1.5px solid var(--ink-soft);border-radius:8px;
-  background:var(--paper);color:var(--pencil);font:400 16px/1.2 inherit;-webkit-appearance:none}
-.find::placeholder{color:var(--ink-soft)}
-.find:focus{outline:none;border-color:var(--ink)}
-.count{margin:10px 2px 0;font-size:13.5px;color:var(--ink-soft)}
-a.card[hidden]{display:none}
-.note{margin:22px 2px 0;font-size:13.5px;color:var(--ink-soft)}
-.mid{text-align:center;padding-top:8vh}
-.mid h1{font-size:46px}
-.mid p{margin:16px auto 0;max-width:34ch;color:var(--ink-soft)}
-.back{display:inline-block;margin-top:26px;border:1.5px solid var(--ink);border-radius:6px;padding:13px 22px;color:var(--ink);text-decoration:none;font-weight:700}
-a:focus-visible,button:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+${tokens(null)}
+${UI_CSS}
+
+/* --- the shell's own additions, all from the tokens above --- */
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{font-size:34px}
+.tagline{color:var(--dim);font-size:15.5px;margin:8px 2px 22px;max-width:36ch}
+
+/* One app per row. A whole row is the tap target, not just the title. */
+a.applink{display:flex;align-items:center;gap:13px;padding:13px 14px;text-decoration:none;color:inherit;
+  min-height:var(--tap);transition:background var(--fast) linear}
+a.applink:active{background:var(--inset)}
+a.applink[hidden]{display:none}
+.ic{width:40px;height:40px;border-radius:10px;flex:none;box-shadow:var(--edge)}
+.t{display:block;font-weight:600;font-size:16.5px;line-height:1.25}
+.d{display:block;font-size:13.5px;color:var(--dim);margin-top:2px;line-height:1.35}
+.arrow{color:var(--faint);flex:none;display:grid;place-items:center}
+
+.note{margin:22px 2px 0;font-size:13px;color:var(--faint);line-height:1.5}
+.find{margin-bottom:12px}
+
+/* 404, offline and the switched-off page. */
+.mid{text-align:center;padding-top:10vh}
+.mid h1{font-size:30px}
+.mid p{margin:12px auto 0;max-width:34ch;color:var(--dim)}
+.back{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:26px;
+  min-height:54px;padding:0 22px;border-radius:var(--r);background:var(--accent);color:var(--accent-ink);
+  text-decoration:none;font-weight:600;box-shadow:var(--lift);
+  transition:transform var(--fast) var(--spring)}
+.back:active{transform:scale(.972)}
+
 /* Hide only the variants that do NOT match the current language. Revealing a
    match with display:revert would reset it to the UA default and discard the
    author's own display rule, e.g. .t{display:block}. */
 ${LANGS.map((l) => `html[lang="${l}"] [data-l]:not([data-l="${l}"]){display:none}`).join('\n')}
-${LANG_TOGGLE_CSS}
 `.trim();
 
-const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">`;
+const FONTS = FONT_LINK;
 
 // Renders one string in every language as sibling elements; CSS shows the one
 // matching html[lang]. No flash, and it still reads correctly with JS disabled.
@@ -331,10 +327,10 @@ const cards = enabled.length
   ? enabled.map((a) => {
       const t = Object.fromEntries(LANGS.map((l) => [l, pick(a.meta.title, l, `${a.slug}.title`)]));
       const d = Object.fromEntries(LANGS.map((l) => [l, pick(a.meta.description, l, `${a.slug}.description`)]));
-      return `  <a class="card" href="/${a.slug}/">
-    <img class="ic" src="/${a.slug}/icon-192.png" alt="" width="38" height="38" loading="lazy">
-    <span class="body">${ml('span', t, ' class="t"')}${ml('span', d, ' class="d"')}</span>
-    <span class="arrow" aria-hidden="true">→</span>
+      return `  <a class="applink" href="/${a.slug}/">
+    <img class="ic" src="/${a.slug}/icon-192.png" alt="" width="40" height="40" loading="lazy">
+    <span class="grow">${ml('span', t, ' class="t"')}${ml('span', d, ' class="d"')}</span>
+    <span class="arrow" aria-hidden="true">${ARROW}</span>
   </a>`;
     }).join('\n')
   : '  <div class="empty">' + ml('span', Object.fromEntries(LANGS.map((l) => [l, l === 'fr' ? 'Rien de publié pour le moment.' : 'Nothing published yet.']))) + '</div>';
@@ -350,7 +346,7 @@ const FIND = { en: 'Search games', fr: 'Rechercher un jeu' };
 const NONE = { en: 'Nothing matches that.', fr: 'Aucun résultat.' };
 
 const filterMarkup = FILTER_ON
-  ? `<input class="find" id="find" type="search" autocomplete="off" autocapitalize="none" spellcheck="false"
+  ? `<input class="field find" id="find" type="search" autocomplete="off" autocapitalize="none" spellcheck="false"
     aria-label="${esc(FIND[DEFAULT_LANG])}" placeholder="${esc(FIND[DEFAULT_LANG])}">\n`
   : '';
 
@@ -358,7 +354,7 @@ const filterJs = FILTER_ON ? `
 (function(){
   var box=document.getElementById('find'), list=document.getElementById('list');
   if(!box||!list) return;
-  var cards=[].slice.call(list.querySelectorAll('a.card'));
+  var cards=[].slice.call(list.querySelectorAll('a.applink'));
   var none=document.getElementById('none');
   var FIND=${JSON.stringify(FIND)}, NONE=${JSON.stringify(NONE)};
   function lang(){ return (window.JLang&&window.JLang.get())||document.documentElement.lang||'${DEFAULT_LANG}'; }
@@ -393,11 +389,11 @@ const landing = page({
   description: SITE_TAGLINE[DEFAULT_LANG],
   extraJs: filterJs,
   body: `<div class="head">
-  <h1 class="disp">${ml('span', SITE_TITLE)}</h1>
-  <div id="langslot"></div>
+  <h1>${ml('span', SITE_TITLE)}</h1>
+  <div class="seg" id="langslot" role="group" aria-label="Language"></div>
 </div>
 <p class="tagline">${ml('span', SITE_TAGLINE)}</p>
-${filterMarkup}<div class="sheet" id="list">
+${filterMarkup}<div class="card list" id="list">
 ${cards}
 </div>
 <p class="empty" id="none" hidden>${esc(NONE[DEFAULT_LANG])}</p>
@@ -408,7 +404,7 @@ const mini = (titles, bodies, link) => page({
   title: titles[DEFAULT_LANG],
   description: bodies[DEFAULT_LANG],
   body: `<div class="mid">
-  <h1 class="disp">${ml('span', titles)}</h1>
+  <h1>${ml('span', titles)}</h1>
   <p>${ml('span', bodies)}</p>
   <a class="back" href="/">${ml('span', link)}</a>
 </div>`,
@@ -483,22 +479,29 @@ if('serviceWorker' in navigator) window.addEventListener('load',function(){
 // that it exists. iOS has no beforeinstallprompt, so the only thing that works
 // there is showing the user the Share glyph they are looking for and where it
 // is. Asks once, remembers a dismissal, and never appears once installed.
+// Built from the kit's tokens, because this is injected into every page and a
+// prompt on last year's palette on top of this year's page is exactly the kind
+// of seam a player notices. The fallbacks only ever apply to a page that
+// somehow has no kit at all.
 const INSTALL_CSS = `
-.jpwa{position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:0 12px calc(12px + env(safe-area-inset-bottom));
-  transform:translateY(130%);transition:transform .32s cubic-bezier(.2,.8,.3,1)}
+.jpwa{position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));
+  transform:translateY(130%);transition:transform var(--slow,340ms) var(--ease,cubic-bezier(.16,1,.3,1))}
 .jpwa.on{transform:translateY(0)}
-.jpwa-in{max-width:496px;margin:0 auto;display:flex;gap:12px;align-items:flex-start;
-  background:var(--paper,#fff);color:var(--pencil,#333);border:1.5px solid var(--ink,#1B3A9C);
-  border-radius:14px;padding:14px;box-shadow:0 10px 34px rgba(0,0,0,.22)}
-.jpwa-ic{width:44px;height:44px;border-radius:10px;flex:none}
-.jpwa-tx{flex:1;min-width:0;font:400 14.5px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-.jpwa-tx b{display:block;font-size:16px;color:var(--ink,#1B3A9C);margin-bottom:3px}
+.jpwa-in{max-width:480px;margin:0 auto;display:flex;gap:12px;align-items:flex-start;
+  background:var(--raised,#1A1D25);color:var(--text,#ECEEF3);border:1px solid var(--line,#262A34);
+  border-radius:var(--r,14px);padding:14px;
+  box-shadow:var(--lift-hi,0 18px 44px #0009),var(--edge,inset 0 1px 0 hsl(0 0% 100%/.06))}
+.jpwa-ic{width:44px;height:44px;border-radius:10px;flex:none;box-shadow:var(--edge,none)}
+.jpwa-tx{flex:1;min-width:0;font:400 14.5px/1.45 inherit}
+.jpwa-tx b{display:block;font-size:16px;font-weight:600;color:var(--text,#ECEEF3);margin-bottom:3px;letter-spacing:-.01em}
 .jpwa-sh{display:inline-block;width:1em;height:1em;vertical-align:-.16em;margin:0 .12em}
-.jpwa-go{margin-top:10px;width:100%;border:1.5px solid var(--ink,#1B3A9C);background:var(--ink,#1B3A9C);
-  color:var(--on-ink,#fff);border-radius:8px;padding:12px;font:700 15px/1 system-ui,sans-serif;cursor:pointer}
-.jpwa-x{flex:none;width:40px;height:40px;border:0;background:transparent;color:var(--ink-soft,#666);
-  font:400 24px/1 system-ui,sans-serif;cursor:pointer;border-radius:50%;margin:-4px -4px 0 0}
-.jpwa-x:focus-visible,.jpwa-go:focus-visible{outline:3px solid var(--ink-soft,#888);outline-offset:2px}
+.jpwa-go{margin-top:10px;width:100%;border:0;background:var(--accent,#6E8BFF);
+  color:var(--accent-ink,#0B0C10);border-radius:var(--r-sm,9px);min-height:var(--tap,48px);padding:0 14px;
+  font:600 15px/1 inherit;cursor:pointer;transition:transform var(--fast,130ms) var(--spring,ease)}
+.jpwa-go:active{transform:scale(.972)}
+.jpwa-x{flex:none;width:40px;height:40px;border:0;background:transparent;color:var(--faint,#6B7286);
+  font:400 24px/1 inherit;cursor:pointer;border-radius:50%;margin:-4px -4px 0 0}
+.jpwa-x:focus-visible,.jpwa-go:focus-visible{outline:2px solid var(--accent,#6E8BFF);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.jpwa{transition:none}}
 `.trim();
 
