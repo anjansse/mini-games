@@ -284,18 +284,22 @@ dialog.sheet>.body{
   border-radius:var(--r-lg) var(--r-lg) 0 0;box-shadow:var(--lift-hi),var(--edge);
   padding:8px 16px calc(20px + env(safe-area-inset-bottom,0px));
   max-height:88svh;overflow-y:auto;overscroll-behavior:contain;
-  animation:sheet-up var(--slow) var(--ease) both;
+  /* A transition, never an animation. A CSS animation with fill-mode:both
+     outranks inline styles in the cascade, so with one here every transform
+     set from JS — the drag tracking the finger, and the close — was silently
+     discarded, and the keyframe played its own movement instead. Opening and
+     closing are driven from openSheet/closeSheet. */
+  transition:transform var(--slow) var(--ease);
 }
 dialog.sheet>.body::before{
   content:"";display:block;width:36px;height:4px;border-radius:2px;
   background:var(--line);margin:6px auto 14px;
 }
 dialog.sheet h2{margin-bottom:12px}
-@keyframes sheet-up{from{transform:translateY(100%)}to{transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media (min-width:520px){
   dialog.sheet{margin:auto}
-  dialog.sheet>.body{border-radius:var(--r-lg);border-bottom:1px solid var(--line);animation-name:rise}
+  dialog.sheet>.body{border-radius:var(--r-lg);border-bottom:1px solid var(--line)}
   dialog.sheet>.body::before{display:none}
 }
 
@@ -702,13 +706,20 @@ details.past[open] summary{background:var(--inset)}
     el.showModal();
     var body = el.querySelector('.body');
     if(body){
-      // A sheet reopens at the top, never where it was left. Without this a
-      // sheet that was scrolled once comes back scrolled, and its heading and
-      // first options sit above the fold looking as though they are missing.
-      // This has to run AFTER showModal: a closed <dialog> is display:none,
-      // and assigning scrollTop to a display:none element does nothing.
-      body.style.transition = ''; body.style.transform = ''; body.style.animation = '';
+      // A sheet reopens at the top, never where it was left, or its heading
+      // and first options sit above the fold looking as though they are
+      // missing. This must run AFTER showModal: a closed <dialog> is
+      // display:none, and scrollTop on a display:none element does nothing.
+      body.style.animation = '';
+      body.style.transition = 'none';
+      body.style.transform = 'translateY(100%)';
       body.scrollTop = 0;
+      void body.offsetHeight;                    // flush, so the start sticks
+      if(reduce.matches){ body.style.transition = ''; body.style.transform = ''; }
+      else requestAnimationFrame(function(){
+        body.style.transition = '';              // back to the CSS transition
+        body.style.transform = '';
+      });
     }
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
     dragSheet(el);
@@ -768,17 +779,17 @@ details.past[open] summary{background:var(--inset)}
     if(!el || !el.open) return;
     var body = el.querySelector('.body');
     if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
-    // A transition, not the keyframe reversed: a keyframe always starts from
-    // translateY(0), so closing a sheet the finger had already dragged to
-    // 150px snapped it back up first and then played it down — the double
-    // movement. A transition runs from wherever it actually is.
-    body.style.animation = '';
+    if(body.dataset.closing === '1') return;      // one close, not one per tap
+    body.dataset.closing = '1';
+    // Carries on from the current offset, so a sheet already dragged halfway
+    // down finishes the journey instead of restarting it.
     body.style.transition = 'transform var(--mid) var(--ease)';
     body.style.transform = 'translateY(100%)';
     setTimeout(function(){
+      delete body.dataset.closing;
       body.style.transition = ''; body.style.transform = '';
       el.close();
-    }, 210);
+    }, 230);
   }
 
   /* Announce something to a screen reader without showing it. A score that
