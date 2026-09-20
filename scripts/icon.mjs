@@ -241,19 +241,20 @@ function roundedTile(x, y, r) {
 // with the number of apps, which is what matters at a few hundred games.
 const masterCache = new Map();
 
-function renderMaster(slug, glyph, maskable) {
-  const key = (GLYPHS[glyph] ? glyph : 'mark') + '|' + (hash(slug) % HUES.length) + '|' + (maskable ? 1 : 0);
+function renderMaster(slug, glyph, maskable, bare) {
+  const key = (GLYPHS[glyph] ? glyph : 'mark') + '|' + (hash(slug) % HUES.length) + '|' + (maskable ? 1 : 0) + '|' + (bare ? 'b' : '');
   const hit = masterCache.get(key);
   if (hit) return hit;
-  const built = buildMaster(slug, glyph, maskable);
+  const built = buildMaster(slug, glyph, maskable, bare);
   masterCache.set(key, built);
   return built;
 }
 
-function buildMaster(slug, glyph, maskable) {
+function buildMaster(slug, glyph, maskable, bare) {
   const h = hash(slug);
   const bg = hslToRgb(HUES[h % HUES.length], 0.5, 0.32);
   const fg = hslToRgb(HUES[h % HUES.length], 0.55, 0.95);
+  const mid = hslToRgb(HUES[h % HUES.length], 0.68, 0.56);   // bare mode only
   const polys = parsePath(GLYPHS[glyph] || GLYPHS.mark);
 
   // A maskable icon is cropped to a circle by the launcher, so the tile bleeds
@@ -297,10 +298,22 @@ function buildMaster(slug, glyph, maskable) {
       const n = SS * SS;
       const ta = tile / n, ma = (mark / n) * ta;
       const p = (y * size + x) * 4;
-      px[p]     = Math.round(bg[0] * (1 - ma) + fg[0] * ma);
-      px[p + 1] = Math.round(bg[1] * (1 - ma) + fg[1] * ma);
-      px[p + 2] = Math.round(bg[2] * (1 - ma) + fg[2] * ma);
-      px[p + 3] = Math.round(255 * ta);
+      if (bare) {
+        // No tile: the mark alone over transparency. It has to read on both
+        // grounds — a dark card in the catalogue and a white one in light
+        // mode — so it takes a mid-lightness version of the hue rather than
+        // the dark tile colour or the near-white mark colour, either of which
+        // disappears against one of the two. Coverage goes to alpha, and the
+        // colour is written at full strength, so edges stay clean instead of
+        // fringing toward a background that is not there.
+        px[p] = mid[0]; px[p + 1] = mid[1]; px[p + 2] = mid[2];
+        px[p + 3] = Math.round(255 * ma);
+      } else {
+        px[p]     = Math.round(bg[0] * (1 - ma) + fg[0] * ma);
+        px[p + 1] = Math.round(bg[1] * (1 - ma) + fg[1] * ma);
+        px[p + 2] = Math.round(bg[2] * (1 - ma) + fg[2] * ma);
+        px[p + 3] = Math.round(255 * ta);
+      }
     }
   }
   return px;
@@ -334,16 +347,23 @@ function downscale(src, from, to) {
  * Renders one master per variant and derives every requested size from it.
  * @returns {Map<string, Buffer>} keyed "<size>" and "<size>m" for maskable
  */
-export function iconSet(slug, glyph, sizes, maskableSizes = []) {
+export function iconSet(slug, glyph, sizes, maskableSizes = [], bareSizes = []) {
   const out = new Map();
   const g = GLYPHS[glyph] ? glyph : 'mark';
   const hue = hash(slug) % HUES.length;
   const take = (want, mask, label) => {
     for (const s of want) {
-      const key = g + '|' + hue + '|' + (mask ? 1 : 0) + '|' + s;
+      // Two sizes never go bare, whatever the app asks for:
+      //   - the maskable one, which the Android launcher crops and fills;
+      //   - apple-touch-icon, because iOS composites transparency onto BLACK
+      //     rather than honouring it, so a bare icon there is not "no tile",
+      //     it is a black tile chosen by the OS instead of by us.
+      // Which sizes may go bare is the caller's decision; see build.mjs.
+      const b = !mask && bareSizes.includes(s);
+      const key = g + '|' + hue + '|' + (mask ? 1 : 0) + '|' + s + '|' + (b ? 'b' : '');
       let png = pngCache.get(key);
       if (!png) {
-        png = encodePng(s, downscale(renderMaster(slug, glyph, mask), MASTER, s));
+        png = encodePng(s, downscale(renderMaster(slug, glyph, mask, b), MASTER, s));
         pngCache.set(key, png);
       }
       out.set(label(s), png);

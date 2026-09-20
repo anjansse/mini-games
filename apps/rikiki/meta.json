@@ -7,5 +7,6 @@
   "languages": ["en", "fr"],
   "created": "2026-09-20",
   "icon": "spade",
+  "bareIcon": true,
   "notes": "Migrated from a Claude artifact. The artifact's cross-device backup (window.claude db/user capabilities) was removed; state is localStorage-only."
 }

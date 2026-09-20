@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { iconSet, themeColor, GLYPHS, GLYPH_NAMES, defaultGlyph } from './icon.mjs';
-import { syncSource, isCurrent, uiVersion, tokens, UI_CSS, FONT_LINK } from './ui.mjs';
+import { syncSource, isCurrent, uiVersion, tokens, UI_CSS, UI_JS, FONT_LINK, THEME_RUNTIME } from './ui.mjs';
 
 // The kit's own chevron, so the index points the same way a game does.
 const ARROW = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
@@ -175,7 +175,8 @@ for (const entry of config.apps) {
   }
 
   apps.push({ slug, enabled: entry.enabled === true, meta, html, source, langs: appLangs,
-              glyph: meta.icon || defaultGlyph(slug), bytes: Buffer.byteLength(source) });
+              glyph: meta.icon || defaultGlyph(slug), bareIcon: meta.bareIcon === true,
+              bytes: Buffer.byteLength(source) });
 }
 
 if (existsSync(join(ROOT, 'apps'))) {
@@ -303,6 +304,8 @@ ${SHELL_CSS}${extraCss ? '\n' + extraCss : ''}
 </style>
 <script>
 ${LANG_RUNTIME}
+
+${THEME_RUNTIME}
 </script>
 </head>
 <body${bodyClass ? ` class="${bodyClass}"` : ''}>
@@ -310,11 +313,13 @@ ${LANG_RUNTIME}
 ${body}
 </main>
 <script>
+${UI_JS}
 ${LANG_TOGGLE_JS}
 (function(){
   var slot=document.getElementById('langslot');
   if(slot) slot.innerHTML=langBar();
   window.addEventListener('jlangchange',function(){ if(slot) slot.innerHTML=langBar(); });
+  UI.themeButton(document.getElementById('theme'));
 })();${extraJs ? '\n' + extraJs : ''}
 </script>
 </body>
@@ -423,7 +428,10 @@ const landing = page({
   extraJs: filterJs + installJsLanding,
   body: `<div class="head">
   <h1>${ml('span', SITE_TITLE)}</h1>
-  <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+  <div class="chrome">
+    <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+    <button class="act" type="button" id="theme" aria-label="Theme"></button>
+  </div>
 </div>
 <p class="tagline">${ml('span', SITE_TAGLINE)}</p>
 ${filterMarkup}<div class="card list" id="list">
@@ -680,7 +688,9 @@ for (const a of apps) {
   if (!a.enabled) continue;
   put(`${a.slug}/manifest.webmanifest`, manifest(
     pick(a.meta.title, DEFAULT_LANG, a.slug), pick(a.meta.title, DEFAULT_LANG, a.slug), a.slug, base));
-  const set = iconSet(a.slug, a.glyph, [180, 192, 512], [512]);
+  // 180 is apple-touch-icon and stays a solid tile: iOS fills transparency with
+  // black, so "bare" there would swap our tile for a black one, not remove it.
+  const set = iconSet(a.slug, a.glyph, [180, 192, 512], [512], a.bareIcon ? [192, 512] : []);
   put(`${a.slug}/icon-180.png`, set.get('180'));
   put(`${a.slug}/icon-192.png`, set.get('192'));
   put(`${a.slug}/icon-512.png`, set.get('512'));

@@ -104,8 +104,13 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 
 .row{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:var(--tap)}
 .grow{min-width:0;flex:1}
-/* display:block so these read the same whether the app emits div or span */
-.row .title{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* display:block so these read the same whether the app emits div or span.
+   Wrapping is the default: a settings label like "Points lost per trick off"
+   is longer than its track and clipping it to "Points lost per tric…" hides
+   the thing being set. Add .one where a single line is genuinely wanted and
+   the text is known to be short, such as a player's name. */
+.row .title{display:block;font-weight:600}
+.row .title.one{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sub{display:block;font-size:13px;color:var(--dim);margin-top:1px}
 .row.lead{background:var(--accent-wash)}
 
@@ -240,13 +245,18 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 }
 .appbar.stuck{border-bottom-color:var(--line)}
 .appbar h1{font-size:19px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.appbar .act{
+/* Not scoped to .appbar: the index and the 404 page want the same icon button
+   without pretending to have an app bar. */
+.act{
   width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;
-  background:transparent;color:var(--dim);cursor:pointer;
+  background:transparent;color:var(--dim);cursor:pointer;text-decoration:none;
   transition:transform var(--fast) var(--spring),background var(--fast) linear,color var(--fast) linear;
 }
-.appbar .act:active{transform:scale(.88);background:var(--inset)}
-.appbar .act:hover{color:var(--text)}
+.act:active{transform:scale(.88);background:var(--inset)}
+.act:hover{color:var(--text)}
+/* Chrome controls that sit together — the language toggle and the theme
+   button — so they read as one group rather than two loose objects. */
+.chrome{display:flex;align-items:center;gap:4px;flex:none}
 
 /* Screens are siblings; exactly one is visible. Toggle with el.hidden, never
    style.display, so assistive tech follows along. */
@@ -372,6 +382,33 @@ dialog.sheet h2{margin-bottom:12px}
     }
   };
 })();
+
+(function(){
+  var K='jnssn-theme', MODES=['auto','light','dark'];
+  function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
+  var s=stored(), cur = MODES.indexOf(s)>-1 ? s : 'auto';
+  function apply(m){
+    var r=document.documentElement;
+    if(m==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', m);
+  }
+  apply(cur);
+  window.JTheme={
+    modes:MODES,
+    get:function(){ return cur; },
+    // What the page actually renders as, once "auto" is resolved.
+    resolved:function(){
+      if(cur!=='auto') return cur;
+      return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    },
+    set:function(m){
+      if(MODES.indexOf(m)<0 || m===cur) return;
+      cur=m; apply(m);
+      try{ localStorage.setItem(K,m); }catch(e){}
+      window.dispatchEvent(new CustomEvent('jthemechange',{detail:m}));
+    },
+    cycle:function(){ this.set(MODES[(MODES.indexOf(cur)+1)%MODES.length]); }
+  };
+})();
 </script>
 </head>
 <body>
@@ -381,7 +418,10 @@ dialog.sheet h2{margin-bottom:12px}
 <header class="appbar">
   <a class="act" href="/" id="homelink" aria-label="All games"></a>
   <h1 id="apptitle">APP TITLE</h1>
-  <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+  <div class="chrome">
+    <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+    <button class="act" type="button" id="theme" aria-label="Theme"></button>
+  </div>
   <button class="act" type="button" id="opensettings" aria-label="Settings"></button>
 </header>
 
@@ -550,6 +590,9 @@ dialog.sheet h2{margin-bottom:12px}
     trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
     play:'M7 4l13 8-13 8z', pause:'M8 5v14M16 5v14', again:'M20 11a8 8 0 10-2.3 6M20 5v6h-6',
     home:'M4 11l8-7 8 7M7 10v10h10V10', info:'M12 10v7M12 7h.01',
+    sun:'M12 4V2M12 22v-2M4 12H2M22 12h-2M6.3 6.3L4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+    moon:'M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z',
+    auto:'M12 3a9 9 0 000 18zM12 3a9 9 0 010 18',
     trophy:'M7 4h10v5a5 5 0 01-10 0zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3M9 20h6M12 14v6'
   };
   function icon(name, size){
@@ -557,6 +600,33 @@ dialog.sheet h2{margin-bottom:12px}
     return '<svg viewBox="0 0 24 24" width="' + (size||22) + '" height="' + (size||22) + '" fill="none" ' +
       'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<path d="' + d + '"/></svg>';
+  }
+
+  /* Wire a button to cycle auto -> light -> dark. One button rather than three
+     because the bar has no room for a segmented control next to the language
+     one; the glyph shows the CURRENT state and the label names it, so nothing
+     depends on the player guessing what a half-filled circle means. */
+  var THEME_LABEL = {
+    en:{auto:'Theme: follow the phone', light:'Theme: light', dark:'Theme: dark'},
+    fr:{auto:'Thème : selon le téléphone', light:'Thème : clair', dark:'Thème : sombre'}
+  };
+  function themeButton(el){
+    if(!el || !window.JTheme) return;
+    function lang(){ return (window.JLang && window.JLang.get()) || document.documentElement.lang || 'en'; }
+    function paint(){
+      var m = JTheme.get();
+      el.innerHTML = icon(m === 'auto' ? 'auto' : m === 'light' ? 'sun' : 'moon', 20);
+      var label = (THEME_LABEL[lang()] || THEME_LABEL.en)[m];
+      el.setAttribute('aria-label', label);
+      el.setAttribute('title', label);
+    }
+    el.addEventListener('click', function(){
+      JTheme.cycle();
+      live((THEME_LABEL[lang()] || THEME_LABEL.en)[JTheme.get()]);
+    });
+    addEventListener('jthemechange', paint);
+    addEventListener('jlangchange', paint);
+    paint();
   }
 
   /* The app bar gains its rule only once the page is actually scrolled. */
@@ -574,7 +644,7 @@ dialog.sheet h2{margin-bottom:12px}
     swap:swap, setText:setText, setAttr:setAttr,
     toast:toast, hideToast:hide,
     screen:screen, openSheet:openSheet, closeSheet:closeSheet,
-    live:live, icon:icon, icons:P,
+    live:live, icon:icon, icons:P, themeButton:themeButton,
     reduced:function(){ return reduce.matches; }
   };
 })();
@@ -695,6 +765,7 @@ dialog.sheet h2{margin-bottom:12px}
   $('opensettings').innerHTML = UI.icon('cog', 20);
   $('minus').innerHTML = UI.icon('minus', 24);
   $('plus').innerHTML = UI.icon('plus', 24);
+  UI.themeButton($('theme'));
 
   document.addEventListener('click', function(e){
     var lb = e.target.closest('[data-lang]');

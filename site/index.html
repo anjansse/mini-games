@@ -103,8 +103,13 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 
 .row{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:var(--tap)}
 .grow{min-width:0;flex:1}
-/* display:block so these read the same whether the app emits div or span */
-.row .title{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* display:block so these read the same whether the app emits div or span.
+   Wrapping is the default: a settings label like "Points lost per trick off"
+   is longer than its track and clipping it to "Points lost per tric…" hides
+   the thing being set. Add .one where a single line is genuinely wanted and
+   the text is known to be short, such as a player's name. */
+.row .title{display:block;font-weight:600}
+.row .title.one{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sub{display:block;font-size:13px;color:var(--dim);margin-top:1px}
 .row.lead{background:var(--accent-wash)}
 
@@ -239,13 +244,18 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 }
 .appbar.stuck{border-bottom-color:var(--line)}
 .appbar h1{font-size:19px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.appbar .act{
+/* Not scoped to .appbar: the index and the 404 page want the same icon button
+   without pretending to have an app bar. */
+.act{
   width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;
-  background:transparent;color:var(--dim);cursor:pointer;
+  background:transparent;color:var(--dim);cursor:pointer;text-decoration:none;
   transition:transform var(--fast) var(--spring),background var(--fast) linear,color var(--fast) linear;
 }
-.appbar .act:active{transform:scale(.88);background:var(--inset)}
-.appbar .act:hover{color:var(--text)}
+.act:active{transform:scale(.88);background:var(--inset)}
+.act:hover{color:var(--text)}
+/* Chrome controls that sit together — the language toggle and the theme
+   button — so they read as one group rather than two loose objects. */
+.chrome{display:flex;align-items:center;gap:4px;flex:none}
 
 /* Screens are siblings; exactly one is visible. Toggle with el.hidden, never
    style.display, so assistive tech follows along. */
@@ -390,13 +400,43 @@ html[lang="fr"] [data-l]:not([data-l="fr"]){display:none}
     }
   };
 })();
+
+(function(){
+  var K='jnssn-theme', MODES=['auto','light','dark'];
+  function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
+  var s=stored(), cur = MODES.indexOf(s)>-1 ? s : 'auto';
+  function apply(m){
+    var r=document.documentElement;
+    if(m==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', m);
+  }
+  apply(cur);
+  window.JTheme={
+    modes:MODES,
+    get:function(){ return cur; },
+    // What the page actually renders as, once "auto" is resolved.
+    resolved:function(){
+      if(cur!=='auto') return cur;
+      return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    },
+    set:function(m){
+      if(MODES.indexOf(m)<0 || m===cur) return;
+      cur=m; apply(m);
+      try{ localStorage.setItem(K,m); }catch(e){}
+      window.dispatchEvent(new CustomEvent('jthemechange',{detail:m}));
+    },
+    cycle:function(){ this.set(MODES[(MODES.indexOf(cur)+1)%MODES.length]); }
+  };
+})();
 </script>
 </head>
 <body>
 <main class="wrap">
 <div class="head">
   <h1><span data-l="en">Games</span><span data-l="fr">Jeux</span></h1>
-  <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+  <div class="chrome">
+    <div class="seg" id="langslot" role="group" aria-label="Language"></div>
+    <button class="act" type="button" id="theme" aria-label="Theme"></button>
+  </div>
 </div>
 <p class="tagline"><span data-l="en">Small self-contained games, made on a phone.</span><span data-l="fr">De petits jeux autonomes, créés depuis un téléphone.</span></p>
 <div class="card list" id="list">
@@ -411,6 +451,176 @@ html[lang="fr"] [data-l]:not([data-l="fr"]){display:none}
 <p class="note"><span data-l="en">Everything here runs entirely in your browser. Nothing you type leaves the device. Add a game to your Home Screen and it works with no signal.</span><span data-l="fr">Tout fonctionne entièrement dans votre navigateur. Rien de ce que vous tapez ne quitte l’appareil. Ajoutez un jeu à l’écran d’accueil et il marche sans réseau.</span></p>
 </main>
 <script>
+(function(){
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+  /* Swap a view with a transition where the browser has one. Safari 18+,
+     Chrome 111+; everywhere else the callback simply runs. */
+  function swap(fn){
+    if(reduce.matches || !document.startViewTransition){ fn(); return; }
+    document.startViewTransition(fn);
+  }
+
+  /* Update in place. Rebuilding a screen with innerHTML on every tap throws
+     away focus, scroll position and screen-reader context, and makes animation
+     impossible — so text that changes goes through here instead. */
+  function setText(el, v){
+    if(!el) return;
+    v = String(v);
+    if(el.textContent === v) return;
+    el.textContent = v;
+    if(!reduce.matches){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  }
+  function setAttr(el, k, v){
+    if(!el) return;
+    if(v === false || v == null) el.removeAttribute(k);
+    else if(el.getAttribute(k) !== String(v)) el.setAttribute(k, v);
+  }
+
+  /* One toast at a time, with an optional undo. Undo beats a confirmation
+     dialog: it costs one tap instead of two and never blocks the screen. */
+  var host, timer, cur;
+  function toast(msg, opts){
+    opts = opts || {};
+    if(!host){ host = document.createElement('div'); host.id = 'toast'; document.body.appendChild(host); }
+    clearTimeout(timer);
+    host.textContent = '';
+    var box = document.createElement('div');
+    box.className = 't'; box.setAttribute('role','status');
+    var text = document.createElement('span'); text.textContent = msg; box.appendChild(text);
+    if(opts.undo){
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = opts.undoLabel || 'Undo';
+      b.addEventListener('click', function(){ hide(); opts.undo(); });
+      box.appendChild(b);
+    }
+    host.appendChild(box); cur = box;
+    timer = setTimeout(hide, opts.ms || (opts.undo ? 6000 : 3200));
+  }
+  function hide(){
+    clearTimeout(timer);
+    if(!cur) return;
+    var box = cur; cur = null;
+    box.classList.add('out');
+    setTimeout(function(){ if(box.parentNode) box.parentNode.removeChild(box); }, 220);
+  }
+
+  /* Show one .screen, hide its siblings. Focus moves to the new screen and
+     scroll returns to the top — what a native app does on a push, and what a
+     hand-rolled swap always forgets, leaving the keyboard user stranded where
+     the old screen used to be. */
+  function screen(id){
+    var next = typeof id === 'string' ? document.getElementById(id) : id;
+    if(!next || next.dataset.cur === '1') return;
+    swap(function(){
+      var all = document.querySelectorAll('.screen');
+      for(var i=0;i<all.length;i++){ all[i].hidden = all[i] !== next; delete all[i].dataset.cur; }
+      next.dataset.cur = '1';
+      if(!next.hasAttribute('tabindex')) next.setAttribute('tabindex','-1');
+      next.focus({preventScroll:true});
+      window.scrollTo({top:0, behavior: reduce.matches ? 'auto' : 'smooth'});
+    });
+  }
+
+  /* Open a <dialog> as a bottom sheet. Native dialog gives focus trapping,
+     Esc and inert background for free; this only adds the exit animation and
+     a tap-outside-to-close that matches what a phone user expects. */
+  function openSheet(el){
+    el = typeof el === 'string' ? document.getElementById(el) : el;
+    if(!el || el.open) return;
+    el.showModal();
+    el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
+  }
+  function closeSheet(el){
+    el = typeof el === 'string' ? document.getElementById(el) : el;
+    if(!el || !el.open) return;
+    var body = el.querySelector('.body');
+    if(reduce.matches || !body){ el.close(); return; }
+    body.style.animation = 'sheet-up var(--mid) var(--ease) reverse both';
+    setTimeout(function(){ body.style.animation = ''; el.close(); }, 200);
+  }
+
+  /* Announce something to a screen reader without showing it. A score that
+     only changes visually is a score a blind player never hears. */
+  var liveEl;
+  function live(msg){
+    if(!liveEl){
+      liveEl = document.createElement('p');
+      liveEl.className = 'sr'; liveEl.setAttribute('role','status'); liveEl.setAttribute('aria-live','polite');
+      document.body.appendChild(liveEl);
+    }
+    liveEl.textContent = '';
+    setTimeout(function(){ liveEl.textContent = msg; }, 60);
+  }
+
+  /* One icon set, so no app hand-writes another plus sign. 24x24, currentColor. */
+  var P = {
+    plus:'M12 5v14M5 12h14', minus:'M5 12h14', check:'M4 12.5l5.5 5.5L20 7',
+    x:'M6 6l12 12M18 6L6 18', back:'M15 5l-7 7 7 7', next:'M9 5l7 7-7 7',
+    up:'M5 15l7-7 7 7', down:'M5 9l7 7 7-7',
+    undo:'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3',
+    cog:'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1v.3a2 2 0 11-4 0v-.2a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00-1.1-2.7H3.9a2 2 0 110-4h.2a1.6 1.6 0 001.1-2.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H10a1.6 1.6 0 001-1.5V4a2 2 0 114 0v.2a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V10a1.6 1.6 0 001.5 1h.3a2 2 0 110 4H20a1.6 1.6 0 00-1.5 1z',
+    trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    play:'M7 4l13 8-13 8z', pause:'M8 5v14M16 5v14', again:'M20 11a8 8 0 10-2.3 6M20 5v6h-6',
+    home:'M4 11l8-7 8 7M7 10v10h10V10', info:'M12 10v7M12 7h.01',
+    sun:'M12 4V2M12 22v-2M4 12H2M22 12h-2M6.3 6.3L4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+    moon:'M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z',
+    auto:'M12 3a9 9 0 000 18zM12 3a9 9 0 010 18',
+    trophy:'M7 4h10v5a5 5 0 01-10 0zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3M9 20h6M12 14v6'
+  };
+  function icon(name, size){
+    var d = P[name]; if(!d) return '';
+    return '<svg viewBox="0 0 24 24" width="' + (size||22) + '" height="' + (size||22) + '" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="' + d + '"/></svg>';
+  }
+
+  /* Wire a button to cycle auto -> light -> dark. One button rather than three
+     because the bar has no room for a segmented control next to the language
+     one; the glyph shows the CURRENT state and the label names it, so nothing
+     depends on the player guessing what a half-filled circle means. */
+  var THEME_LABEL = {
+    en:{auto:'Theme: follow the phone', light:'Theme: light', dark:'Theme: dark'},
+    fr:{auto:'Thème : selon le téléphone', light:'Thème : clair', dark:'Thème : sombre'}
+  };
+  function themeButton(el){
+    if(!el || !window.JTheme) return;
+    function lang(){ return (window.JLang && window.JLang.get()) || document.documentElement.lang || 'en'; }
+    function paint(){
+      var m = JTheme.get();
+      el.innerHTML = icon(m === 'auto' ? 'auto' : m === 'light' ? 'sun' : 'moon', 20);
+      var label = (THEME_LABEL[lang()] || THEME_LABEL.en)[m];
+      el.setAttribute('aria-label', label);
+      el.setAttribute('title', label);
+    }
+    el.addEventListener('click', function(){
+      JTheme.cycle();
+      live((THEME_LABEL[lang()] || THEME_LABEL.en)[JTheme.get()]);
+    });
+    addEventListener('jthemechange', paint);
+    addEventListener('jlangchange', paint);
+    paint();
+  }
+
+  /* The app bar gains its rule only once the page is actually scrolled. */
+  function bar(){
+    var b = document.querySelector('.appbar'); if(!b) return;
+    var on = false;
+    addEventListener('scroll', function(){
+      var next = scrollY > 4;
+      if(next !== on){ on = next; b.classList.toggle('stuck', on); }
+    }, {passive:true});
+  }
+  document.readyState === 'loading' ? addEventListener('DOMContentLoaded', bar) : bar();
+
+  window.UI = {
+    swap:swap, setText:setText, setAttr:setAttr,
+    toast:toast, hideToast:hide,
+    screen:screen, openSheet:openSheet, closeSheet:closeSheet,
+    live:live, icon:icon, icons:P, themeButton:themeButton,
+    reduced:function(){ return reduce.matches; }
+  };
+})();
 function langBar(){
   var l=window.JLang; if(!l||l.langs.length<2) return '';
   return l.langs.map(function(c){
@@ -425,6 +635,7 @@ document.addEventListener('click',function(e){
   var slot=document.getElementById('langslot');
   if(slot) slot.innerHTML=langBar();
   window.addEventListener('jlangchange',function(){ if(slot) slot.innerHTML=langBar(); });
+  UI.themeButton(document.getElementById('theme'));
 })();
 
 (function(){

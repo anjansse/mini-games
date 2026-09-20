@@ -96,6 +96,17 @@ The build validates every app and fails rather than shipping a broken page:
 10. The **UI kit block** must match `scripts/ui.mjs`. Drift is a hard error;
     absence is a warning until every app is migrated.
 
+`meta.json` may set `bareIcon: true` to drop the icon tile and draw the mark
+alone on transparency. `apple-touch-icon` keeps its tile either way — iOS fills
+transparency with black, so bare there swaps our tile for the OS's, rather than
+removing it.
+
+Theme is a third origin-wide preference beside language: `jnssn-theme` holds
+auto/light/dark, `THEME_RUNTIME` applies it in `<head>` before first paint (any
+later and a light-set site on a dark phone paints dark then flips), and
+`UI.themeButton(el)` wires the control. "auto" must stay reachable, or someone
+who once tapped light is stuck there when their phone goes dark at sunset.
+
 `CONTRIBUTING.md` is the contributor-facing version of this list. Change one and
 change the other.
 

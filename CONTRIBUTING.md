@@ -169,6 +169,7 @@ catalogue feel unmaintained.
 | | |
 | --- | --- |
 | Dark mode | Tokens on `:root`, overridden under both `prefers-color-scheme` and `[data-theme]` |
+| Theme choice | `JTheme` (auto/light/dark, key `jnssn-theme`) + `UI.themeButton(el)` in the bar |
 | Safe areas | `.wrap` and `.appbar` pad for the notch and home indicator |
 | Reduced motion | Every animation collapses under `prefers-reduced-motion` |
 | Modals | Native `<dialog>` — focus trap, Esc, inert background, all correct |
@@ -353,6 +354,7 @@ one and change the other.**
 | `index.html` under **250 kB** (warns past 120 kB). | It is served on mobile data and cached whole. |
 | Multilingual apps must use the shared `jnssn-lang` runtime. | Otherwise the site-wide language toggle cannot reach them. |
 | `icon` must name a known mark. | The build rasterises it; an arbitrary emoji cannot be rendered without a font engine. |
+| `bareIcon: true` in `meta.json` drops the tile. | The mark alone on transparency, in a mid-tone of your hue so it reads on a light card and a dark one. `apple-touch-icon` keeps its tile regardless: iOS fills transparency with **black**, so bare there means a black tile chosen by the OS, not no tile. |
 | Valid, unreserved, unique slug. | It is a path at the site root. |
 | The UI kit block must match `scripts/ui.mjs`. | Otherwise one hand-edit silently forks the design system. Run `--sync-ui`. |
 
