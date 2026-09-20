@@ -210,8 +210,15 @@ function hslToRgb(h, s, l) {
 // lands on the muddy yellow-green band, and neighbouring slugs stay distinct.
 const HUES = [222, 258, 292, 330, 352, 14, 32, 174, 196, 208];
 
+// The one hue an app is identified by. The icon, the theme colour and the UI
+// kit's accent all read it, so a game looks like its own icon without anyone
+// choosing a colour by hand.
+export function hueFor(slug) {
+  return HUES[hash(slug) % HUES.length];
+}
+
 export function themeColor(slug) {
-  const [r, g, b] = hslToRgb(HUES[hash(slug) % HUES.length], 0.5, 0.32);
+  const [r, g, b] = hslToRgb(hueFor(slug), 0.5, 0.32);
   return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
