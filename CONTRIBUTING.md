@@ -7,30 +7,188 @@ clone, or from a USB stick on a plane and it behaves the same.
 That constraint is what keeps a few hundred games cheap to host, fast to load
 and possible to maintain from a phone. Everything below exists to protect it.
 
-## Quick start
+This file is written to be followed literally, by a person or by a session. If
+you are an agent: read [`CLAUDE.md`](CLAUDE.md) for the repo's conventions, use
+the **`new-app`** skill for a new game, and use the **`self-contained-html`**
+skill (from the `self-contained-web` plugin) for how to write the file itself.
+This file is the checklist that sits between them.
+
+## How work reaches the site
+
+**There are no pull requests and no issues.** Commit to `main` and push. Pages
+builds and deploys in roughly 30–60 seconds. Pushes to any other branch get a
+preview URL and do not touch production.
+
+That is a deliberate choice for a single-maintainer repo driven from a phone:
+a PR you cannot review comfortably on a phone is a PR that sits there. The
+safety net is the build, not a reviewer — so a red build is the one thing that
+must never be pushed.
+
+New games are registered **disabled**. They go live when Antoine enables them,
+which is a one-line change to `config/apps.json`.
+
+---
+
+## Adding a game, end to end
 
 ```sh
 git clone https://github.com/anjansse/mini-games
 cd mini-games
+```
+
+No dependencies, no install step. Node 18+ is all you need.
+
+### 1. Pick a slug
+
+Lowercase letters, digits, single hyphens: `^[a-z0-9]+(-[a-z0-9]+)*$`. Name it
+for what the app does, not for a brand: `tip-split`, `dice`, `packing`.
+
+Reserved, because they collide with a file at the site root: `index`, `assets`,
+`404`, `sw`, `offline`, `manifest`, `icon`, `_headers`, `_redirects`.
+
+If the slug is already in `config/apps.json`, do not overwrite it. Pick another
+one, or ask before replacing the existing app.
+
+### 2. Scaffold from the boilerplate
+
+```sh
+mkdir -p apps/<slug>
 cp .claude/skills/new-app/boilerplate.html apps/<slug>/index.html
 ```
 
-Then write `apps/<slug>/meta.json`, add the slug to `config/apps.json` with
-`"enabled": false`, and run:
+The boilerplate already carries the light/dark tokens, the phone-width layout,
+the guarded `localStorage` helpers, the `jnssn-lang` runtime and the link home.
+Keep that structure and replace the demo content. Starting from a blank file
+means rediscovering every rule below the hard way.
 
-```sh
-node scripts/build.mjs          # builds, and fails loudly on any violation
-node scripts/build.mjs --check  # validate only
+For a single-language app, delete the language runtime block and the `langBar()`
+call, as the comment in the boilerplate says.
+
+### 3. Write `meta.json`
+
+`apps/<slug>/meta.json` is the only file allowed next to `index.html`.
+
+```json
+{
+  "title":       { "en": "Tip splitter", "fr": "Partage d'addition" },
+  "description": { "en": "One plain line. It shows on the landing page.",
+                   "fr": "Une ligne simple." },
+  "languages":   ["en", "fr"],
+  "created":     "2026-09-20",
+  "icon":        "cards"
+}
 ```
 
-No dependencies to install. If the build is green, the deploy will be.
+| Key | Required | What it is |
+| --- | --- | --- |
+| `title` | yes | Shown on the card and as the page title. |
+| `description` | yes | One plain line, no marketing. Shown on the card. |
+| `created` | yes | `YYYY-MM-DD`. |
+| `languages` | no | Array of codes. Defaults to `["en"]`. More than one means the app **must** use the `jnssn-lang` runtime. |
+| `icon` | no | A **named mark**, not an emoji. Defaults to one derived from the slug. |
+| `notes` | no | Free text for future readers — e.g. what was dropped when migrating an artifact. |
 
-Easier still: ask Claude for a new game in a session and the `new-app` skill
-does all of this for you.
+Any user-facing string is either a plain string (same in every language) or an
+object keyed by language code. A missing translation warns and falls back to
+the default language.
+
+`icon` names one of the marks in `scripts/icon.mjs` — currently `spade`,
+`heart`, `diamond`, `club`, `cards`, `dice`, `star`, `clock`, `list`, `grid`,
+`target`, `bolt`, `flag`, `trophy`, `pencil`, `book`, `note`, `mark`. The build
+rasterises it into PNG icons, tinted by a hue derived from the slug. An emoji
+or an arbitrary character is a build error: rendering one would need a font
+engine. Adding a new mark means adding a filled 24×24 SVG path to `GLYPHS`;
+prefer reusing one, so the set stays coherent.
+
+### 4. Register it, disabled
+
+Append to the `apps` array in `config/apps.json`:
+
+```json
+{ "slug": "<slug>", "enabled": false }
+```
+
+**Disabled by default, always.** Array order is the order on the landing page.
+An app that exists under `apps/` but is missing here is not deployed at all —
+the build warns and carries on, which is how a game silently 404s.
+
+### 5. Build
+
+```sh
+node scripts/build.mjs          # writes site/index.html and dist/
+node scripts/build.mjs --check  # validates only, writes nothing
+```
+
+Must exit 0. If it reports a violation, **fix the app — never weaken the check
+in `scripts/build.mjs` to get past it.** A red build locally is a red deploy on
+Pages, and on Pages it takes the whole site down, not just one game.
+
+A new app is disabled, so it shows as `○ off` and does not appear on the
+landing page. That is correct.
+
+### 6. Test it — the checklist
+
+Do not skip this because the build was green. The build checks conventions, not
+whether the game works.
+
+- 390px wide: no horizontal scroll.
+- Both colour schemes.
+- Both languages, switching **mid-task** — state must survive.
+- Reload: state restored.
+- Offline, after one online visit.
+- Console clean.
+- `node scripts/build.mjs` green.
+
+### 7. Commit and push
+
+```sh
+git add apps/<slug> config/apps.json site/index.html
+git commit -m "feat(apps): add <slug>"
+git push -u origin main
+```
+
+`site/index.html` is generated but **committed** — stage it. `dist/` is
+git-ignored; Pages regenerates it.
+
+One logical change per commit. Conventional Commits, imperative, lowercase
+subject:
+
+```
+feat(apps): add tip-split
+fix(rikiki): dealer could bid the forbidden number
+chore(config): enable tip-split
+build: memoise icon rendering
+docs: ...
+```
+
+---
+
+## Changing an existing game
+
+Same loop, smaller: edit `apps/<slug>/index.html`, run the build, run the
+checklist above, commit as `fix(<slug>): <what broke>`, push to `main`.
+
+Two things to get right:
+
+**Do not break saved state.** Players have games in `localStorage` on their
+phones. If the shape of what you save changes so that old data can no longer be
+read, bump the version suffix in the storage key (`'<slug>-v1'` → `'-v2'`).
+Bumping it discards their saved games, so only do it when you have to, and
+prefer reading the old shape and migrating it.
+
+**Turning a game on or off is not a code change.** Flip `enabled` in
+`config/apps.json`, rebuild, commit as `chore(config): enable <slug>`, push.
+Live in about a minute. Deleting a game is almost never right — disabling it
+keeps the URL alive with a "switched off" page instead of a 404, and the source
+stays in the repo.
+
+---
 
 ## The rules the build enforces
 
-A violation fails the build rather than shipping a broken page.
+A violation fails the build rather than shipping a broken page. This table is
+the contributor-facing copy of the list in [`CLAUDE.md`](CLAUDE.md) — **change
+one and change the other.**
 
 | Rule | Why |
 | --- | --- |
@@ -43,29 +201,13 @@ A violation fails the build rather than shipping a broken page.
 | `index.html` under **250 kB** (warns past 120 kB). | It is served on mobile data and cached whole. |
 | Multilingual apps must use the shared `jnssn-lang` runtime. | Otherwise the site-wide language toggle cannot reach them. |
 | `icon` must name a known mark. | The build rasterises it; an arbitrary emoji cannot be rendered without a font engine. |
+| Valid, unreserved, unique slug. | It is a path at the site root. |
 
-## meta.json
+Plus three that only warn, and are worth reading as errors anyway: an app
+directory missing from `config/apps.json` (it will not deploy), a missing
+translation (it falls back), and an `index.html` past 120 kB.
 
-```json
-{
-  "title":       { "en": "Tip splitter", "fr": "Partage d'addition" },
-  "description": { "en": "One plain line. It shows on the landing page.",
-                   "fr": "Une ligne simple." },
-  "languages":   ["en", "fr"],
-  "created":     "2026-09-20",
-  "icon":        "calc"
-}
-```
-
-Any user-facing string is a plain string or an object keyed by language. A
-missing translation warns and falls back to the default language.
-
-`icon` names one of the marks in `scripts/icon.mjs` — currently `spade`,
-`heart`, `diamond`, `club`, `cards`, `dice`, `star`, `clock`, `list`, `grid`,
-`target`, `bolt`, `flag`, `trophy`, `pencil`, `book`, `note`, `mark`. The build
-rasterises it into PNG icons, tinted by a hue derived from the slug. Adding a
-new mark means adding a filled 24×24 SVG path to `GLYPHS`; prefer reusing one,
-so the set stays coherent.
+---
 
 ## Writing an efficient app
 
@@ -97,6 +239,8 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} 
 **Keep the main thread free.** No layout thrash in a loop, no `setInterval` that
 runs when nothing is moving, and respect `prefers-reduced-motion`.
 
+---
+
 ## Translations
 
 The site is English and French. Strings live in one dictionary in the app, never
@@ -111,11 +255,16 @@ to six categories.
 ```js
 var forms = { one:'carte', other:'cartes' };
 var cat = new Intl.PluralRules('fr').select(n);
-return n + ' ' + (forms[cat] || forms.other);
+return n + ' ' + (forms[cat] || forms.other);
 ```
 
 Use `Intl.NumberFormat` and `Intl.DateTimeFormat` for numbers and dates rather
 than formatting them by hand.
+
+The chosen language lives under the origin-wide key `jnssn-lang`, so switching
+it in one game switches it everywhere. `window.JLang` in the boilerplate reads
+and writes that key and fires a `jlangchange` event; re-render from it rather
+than reloading the page, so state survives the switch.
 
 The full standard for message formatting is **ICU MessageFormat**, and Mozilla's
 **Fluent** is the modern alternative. Both need a runtime library, which would
@@ -124,29 +273,42 @@ already gives us — CLDR plural categories via `Intl` — with a plain dictiona
 on top. If an app ever genuinely needs gender, ordinals or nested selects, that
 is the moment to reconsider, not before.
 
-Translate meaning, not words. If you are not fluent, say so in the pull request
-so a native speaker can check it — especially domain jargon, where a literal
-translation is usually wrong.
+Translate meaning, not words. If you are not fluent, say so in the commit
+message and in your reply, so a native speaker can check it — especially domain
+jargon, where a literal translation is usually wrong.
 
-## Before you open a pull request
+---
 
-- 390px wide: no horizontal scroll.
-- Both colour schemes.
-- Both languages, switching **mid-task** — state must survive.
-- Reload: state restored.
-- Offline, after one online visit.
-- Console clean.
-- `node scripts/build.mjs` green.
+## Migrating a Claude artifact
 
-## Commits
+Artifacts often use `window.claude.use('db')`, `window.claude.use('user')` or
+`window.storage`. None of them exist on Pages, and all of them fail the build.
+Strip the whole remote layer and keep the `localStorage` path.
 
-Conventional Commits, imperative, lowercase subject:
+Then say, in the reply and in `meta.json`'s `notes`, exactly what behaviour was
+lost — usually cross-device sync — rather than letting it be discovered when a
+saved game vanishes.
 
-```
-feat(apps): add tip-split
-fix(rikiki): dealer could bid the forbidden number
-build: memoise icon rendering
-docs: ...
-```
+There is no way to import an HTML file back into the Claude app as an artifact.
+Add to Home Screen is the offline story here.
 
-New games are registered **disabled**. They go live when Antoine enables them.
+---
+
+## When the build fails
+
+The message names the rule and the slug. The common ones:
+
+| Message | Fix |
+| --- | --- |
+| `✗ <slug>: apps must be a single index.html; found …` | Inline the sibling file, or delete it. Only `meta.json` may sit alongside. |
+| `✗ <slug>: references <host>, which is not on the allowlist` | Inline the resource. Data URIs count as inline. |
+| `✗ <slug>: uses a Claude-runtime API` | Remove it; see *Migrating a Claude artifact*. |
+| `✗ <slug>: meta.json icon "…" is not a known mark` | Use a name from the glyph list, not an emoji. |
+| `✗ <slug>: declares N languages but does not use … 'jnssn-lang'` | Keep the boilerplate's language runtime, or set `languages` to one code. |
+| `✗ <slug>: index.html is N kB, over the 250 kB budget` | Drop a dependency. Inline less. |
+| `config/apps.json is missing or has no "apps" array` | Invalid JSON, usually a trailing comma: `node -e 'JSON.parse(require("fs").readFileSync("config/apps.json"))'`. |
+| `apps/<slug>/ is not listed in config/apps.json` (warning) | Register the slug, or the app never deploys. |
+
+For anything that goes wrong *after* a successful push — a stale page, an app
+that 404s, a failed deploy — see the troubleshooting section of
+[`CLAUDE.md`](CLAUDE.md).

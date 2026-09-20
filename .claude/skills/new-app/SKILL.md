@@ -32,20 +32,31 @@ build the app inside it. The boilerplate already carries the light/dark tokens,
 the phone-width layout, the guarded `localStorage` helpers and the link home —
 keep that structure and replace the demo content.
 
-Write `apps/<slug>/meta.json`:
+Write `apps/<slug>/meta.json`. The schema and the full field table are in
+`CONTRIBUTING.md`; the shape the build accepts is:
 
 ```json
 {
-  "title": "Tip splitter",
-  "description": "One line, plain, no marketing. It shows on the landing page.",
-  "lang": "en",
-  "created": "YYYY-MM-DD",
-  "icon": "£"
+  "title":       { "en": "Tip splitter", "fr": "Partage d'addition" },
+  "description": { "en": "One line, plain, no marketing. It shows on the landing page.",
+                   "fr": "Une ligne simple." },
+  "languages":   ["en", "fr"],
+  "created":     "YYYY-MM-DD",
+  "icon":        "cards"
 }
 ```
 
-`icon` is a single character — an emoji or a symbol. It sits next to the title
-on the landing page.
+`title`, `description` and `created` are required. Each user-facing string is a
+plain string or an object keyed by language code.
+
+`icon` is a **named mark** from `GLYPHS` in `scripts/icon.mjs` — `spade`,
+`heart`, `diamond`, `club`, `cards`, `dice`, `star`, `clock`, `list`, `grid`,
+`target`, `bolt`, `flag`, `trophy`, `pencil`, `book`, `note`, `mark`. Not an
+emoji, not an arbitrary character: the build rejects those, because rendering
+one to PNG would need a font engine. Omit it and one is derived from the slug.
+
+`languages` defaults to `["en"]`. Declaring more than one means the app must
+keep the boilerplate's `jnssn-lang` runtime, or the build fails.
 
 ### Migrating a Claude artifact
 
@@ -75,8 +86,12 @@ node scripts/build.mjs
 ```
 
 Must exit 0. If it reports a violation, fix the app — never weaken the check in
-`scripts/build.mjs` to get past it. Then confirm by eye that the generated
-`site/index.html` is what you expect.
+`scripts/build.mjs` to get past it. `node scripts/build.mjs --check` validates
+without writing, if you only want the verdict.
+
+Then walk the test checklist in `CONTRIBUTING.md` — 390px, both colour schemes,
+both languages switching mid-task, reload, offline, clean console. The build
+checks conventions, not whether the game works.
 
 A new app is disabled, so it will show as `○ off` and will not appear on the
 landing page. That is correct.
