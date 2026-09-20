@@ -706,20 +706,51 @@ details.past[open] summary{background:var(--inset)}
     el.showModal();
     var body = el.querySelector('.body');
     if(body){
-      // A sheet reopens at the top, never where it was left, or its heading
-      // and first options sit above the fold looking as though they are
-      // missing. This must run AFTER showModal: a closed <dialog> is
-      // display:none, and scrollTop on a display:none element does nothing.
+      /* Focus the sheet itself, not whatever control happens to be first.
+
+         showModal() autofocuses, and the browser then scrolls that control
+         into view. Safari resolves this a frame LATE — by which time the
+         sheet is sitting at translateY(100%), off the bottom of the screen —
+         so it scrolls the sheet's own content to the end trying to reveal it,
+         and the sheet opens showing its last row instead of its heading.
+         Focusing the container with preventScroll removes the reason to
+         scroll at all, and is better for a keyboard user anyway: focus starts
+         at the sheet and Tab moves into it. */
+      if(!body.hasAttribute('tabindex')) body.setAttribute('tabindex','-1');
+      body.focus({preventScroll:true});
+
+      // A sheet opens at the top, never where it was left. This must run
+      // AFTER showModal: a closed <dialog> is display:none, and scrollTop on
+      // a display:none element does nothing.
+      body.scrollTop = 0;
       body.style.animation = '';
       body.style.transition = 'none';
       body.style.transform = 'translateY(100%)';
-      body.scrollTop = 0;
       void body.offsetHeight;                    // flush, so the start sticks
       if(reduce.matches){ body.style.transition = ''; body.style.transform = ''; }
       else requestAnimationFrame(function(){
         body.style.transition = '';              // back to the CSS transition
         body.style.transform = '';
       });
+
+      /* And take away the ability, not just the reason. While the sheet is
+         sliding in it is partly off-screen, so anything the browser decides
+         to bring into view scrolls the sheet's content instead. Undoing that
+         from a scroll handler is too late — the event is asynchronous, so the
+         wrong position has already been painted for several frames, which is
+         the flick of "scrolled to the bottom, then jumps to the top".
+         overflow:CLIP for the length of the slide means there is nothing to
+         scroll, so the wrong frame is never drawn. It must be clip, not
+         hidden: hidden still permits programmatic scrolling, which is exactly
+         what scroll-into-view does, so it changes nothing. clip removes the
+         scroll container, and scrollTop then cannot move at all. */
+      body.style.overflow = 'clip';
+      clearTimeout(+body.dataset.settle || 0);
+      body.dataset.settle = setTimeout(function(){
+        body.style.overflow = '';
+        body.scrollTop = 0;
+        delete body.dataset.settle;
+      }, 380);
     }
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
     dragSheet(el);
