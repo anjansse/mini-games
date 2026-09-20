@@ -274,16 +274,37 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 /* --- dialog -------------------------------------------------------------
    Native <dialog>: focus trapping, Esc to close and inertness come free and
    correct. Hand-rolled modals get all three wrong. */
+/* The dialog IS the viewport, and the sheet is bounded by the dialog.
+
+   It used to be sized with 88svh. A viewport unit is the browser's idea of
+   the viewport, not the area actually on screen, and on iOS those disagree
+   while the URL bar is settling. A bottom-anchored sheet taller than the
+   visible area has its TOP cut off, so it opens showing its last rows, and
+   snaps to its heading when the viewport settles — which reads exactly like
+   the content having been scrolled, and is why every scrollTop fix missed it.
+
+   inset:0 with height:100% makes the dialog the real viewport box for a
+   top-layer element, and max-height:100% of that can never exceed the screen
+   however the URL bar behaves. No vh unit is involved any more. */
 dialog.sheet{
-  border:0;padding:0;background:transparent;max-width:480px;width:100%;
-  margin:auto auto 0;max-height:88svh;
+  border:0;padding:0;background:transparent;margin:0;
+  position:fixed;inset:0;width:100%;max-width:none;height:100%;max-height:none;
+  overflow:hidden;
 }
+/* Scoped to [open] so the UA's display:none for a closed dialog still wins. */
+dialog.sheet[open]{display:flex;align-items:flex-end;justify-content:center}
 dialog.sheet::backdrop{background:#0009;backdrop-filter:blur(3px);animation:fade var(--mid) var(--ease) both}
 dialog.sheet>.body{
+  width:100%;max-width:480px;
   background:var(--raised);border:1px solid var(--line);border-bottom:0;
   border-radius:var(--r-lg) var(--r-lg) 0 0;box-shadow:var(--lift-hi),var(--edge);
   padding:8px 16px calc(20px + env(safe-area-inset-bottom,0px));
-  max-height:88svh;overflow-y:auto;overscroll-behavior:contain;
+  /* 88% OF THE DIALOG, which is exactly the viewport — the same proportion
+     88svh was reaching for, but measured against the real box rather than the
+     browser's idea of the viewport, so it shrinks with the screen instead of
+     overflowing it. Leaves a strip of backdrop above, so the page behind is
+     still visible and the sheet reads as sitting on top of it. */
+  max-height:88%;overflow-y:auto;overscroll-behavior:contain;
   /* A transition, never an animation. A CSS animation with fill-mode:both
      outranks inline styles in the cascade, so with one here every transform
      set from JS — the drag tracking the finger, and the close — was silently
@@ -298,7 +319,7 @@ dialog.sheet>.body::before{
 dialog.sheet h2{margin-bottom:12px}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media (min-width:520px){
-  dialog.sheet{margin:auto}
+  dialog.sheet[open]{align-items:center}
   dialog.sheet>.body{border-radius:var(--r-lg);border-bottom:1px solid var(--line)}
   dialog.sheet>.body::before{display:none}
 }
