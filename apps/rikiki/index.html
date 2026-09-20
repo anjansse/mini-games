@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rikiki, feuille de score</title>
+<meta name="description" content="Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFBF6; --grid:#D9E4F2; --ink:#1B3A9C; --ink-soft:#5B6FA8;
+  --red:#C4202B; --pencil:#3A3D45; --fill:#EAF0FB; --on-ink:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --grid:#1B2740; --ink:#AFC4FF; --ink-soft:#7F93C8;
+    --red:#FF7B7B; --pencil:#E4E8F2; --fill:#18233C; --on-ink:#0F1626;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --grid:#1B2740; --ink:#AFC4FF; --ink-soft:#7F93C8;
+  --red:#FF7B7B; --pencil:#E4E8F2; --fill:#18233C; --on-ink:#0F1626;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--pencil);background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:22px 22px;min-height:100vh;line-height:1.4;font-size:16px;-webkit-tap-highlight-color:transparent;
+}
+#app{max-width:520px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 16px 8px}
+.disp{font-family:"Caveat","Bradley Hand","Segoe Script",cursive;font-weight:700;color:var(--ink);line-height:1}
+h1{font-size:54px}
+h2{font-size:32px;margin:28px 0 10px}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.top .brand{font-size:26px}
+.sub{color:var(--ink-soft);font-size:15px}
+.round{margin:14px 0 4px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.round .cards{font-size:64px}
+.round .meta{text-align:right;font-size:15px;color:var(--ink-soft)}
+.round .meta b{color:var(--pencil)}
+
+.phases{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0 12px}
+.phases li{padding:9px 6px;border-radius:999px;text-align:center;font-size:14.5px;font-weight:700;border:1.5px solid var(--ink-soft);color:var(--ink-soft);background:var(--paper)}
+.phases li.done{border-style:dashed}
+.phases li.now{border-color:var(--ink);background:var(--ink);color:var(--on-ink)}
+.phases.p2 li.now{border-color:var(--red);background:var(--red)}
+.lead{font-size:34px;margin:4px 2px 10px}
+.p2 + .lead{color:var(--red)}
+
+.sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
+.sheet.p2{border-color:var(--red)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px 8px 14px;border-top:1px solid var(--grid)}
+.row:first-child{border-top:0}
+.row .who{min-width:0;flex:1}
+.row .name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .note{font-size:13.5px;color:var(--ink-soft)}
+.row .note.bad{color:var(--red);font-weight:700}
+.row .note.good{color:var(--ink);font-weight:700}
+.ban{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--red);color:var(--on-ink);font-size:14px;font-weight:700}
+.free{color:var(--ink-soft)}
+.row.dealer{background:var(--fill)}
+.chip{display:inline-block;padding:1px 9px;border-radius:999px;background:var(--fill);color:var(--ink);font-size:13.5px;font-weight:700;margin-right:6px}
+
+.step{display:flex;align-items:center;gap:4px;flex:none}
+.step button{display:grid;place-items:center;padding:0;width:46px;height:46px;border-radius:50%;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font:700 24px/1 "Atkinson Hyperlegible",system-ui,sans-serif;cursor:pointer}
+.step button svg{display:block}
+.step button:active{background:var(--fill)}
+.step button:disabled{opacity:.25;cursor:default}
+.step .val{width:44px;text-align:center;font-size:40px}
+.step .val.forbidden{color:var(--red);text-decoration:line-through}
+.p2 .step .val{color:var(--red)}
+
+.status{margin:12px 2px;font-size:15px;min-height:22px}
+.status.bad{color:var(--red);font-weight:700}
+.status.ok{color:var(--ink);font-weight:700}
+
+.btn{display:block;width:100%;padding:15px 16px;border-radius:6px;cursor:pointer;font:700 17px/1.2 "Atkinson Hyperlegible",system-ui,sans-serif;border:1.5px solid var(--ink);background:var(--ink);color:var(--on-ink)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.ghost{background:var(--paper);color:var(--ink)}
+.btn.danger{border-color:var(--red);color:var(--red);background:var(--paper)}
+.btns{display:grid;gap:10px;margin-top:12px}
+.btns.two{grid-template-columns:1fr 1fr}
+button:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+
+.players .row{padding:6px 8px 6px 14px}
+.players input{flex:1;min-width:0;border:0;border-bottom:1.5px dashed var(--ink-soft);background:transparent;font:700 18px/1.2 "Atkinson Hyperlegible",system-ui,sans-serif;color:var(--pencil);padding:10px 2px;border-radius:0}
+.players input::placeholder{color:var(--ink-soft);font-weight:400;opacity:.8}
+.x{width:40px;height:40px;border:0;background:transparent;color:var(--red);font-size:22px;cursor:pointer;flex:none}
+details{margin-top:18px}
+summary{cursor:pointer;color:var(--ink);font-weight:700;padding:8px 2px}
+.opt .name{font-weight:400}
+.toggle{width:58px;height:34px;border-radius:17px;border:1.5px solid var(--ink);background:transparent;position:relative;cursor:pointer;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:25px;height:25px;border-radius:50%;background:var(--ink-soft);transition:transform .15s}
+.toggle[aria-pressed="true"]{background:var(--ink)}
+.toggle[aria-pressed="true"]::after{transform:translateX(24px);background:var(--on-ink)}
+@media (prefers-reduced-motion:reduce){.toggle::after{transition:none}}
+
+.sheethead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:28px 0 10px}
+.sheethead h2{margin:0}
+.mini{border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);border-radius:999px;padding:8px 12px;font:700 13.5px/1 "Atkinson Hyperlegible",system-ui,sans-serif;cursor:pointer}
+.mini.danger{border-color:var(--red);color:var(--red)}
+details.past{margin-top:10px}
+details.past summary{display:block;list-style:none;background:var(--paper);border:1.5px solid var(--ink-soft);border-radius:6px;padding:10px 14px;font-weight:400;color:var(--pencil)}
+details.past summary::-webkit-details-marker{display:none}
+details.past[open] summary{border-color:var(--ink);margin-bottom:8px}
+.pd{display:block;font-size:13.5px;color:var(--ink-soft)}
+.pl{display:block;font-weight:700}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;text-align:center;border-top:1px solid var(--grid);border-left:1px solid var(--grid);white-space:nowrap}
+tr:first-child th{border-top:0}
+th:first-child,td:first-child{border-left:0;position:sticky;left:0;background:var(--paper);color:var(--ink-soft);font-size:14px;font-weight:400;width:1%}
+thead th{border-bottom:1.5px solid var(--ink);vertical-align:bottom;font-size:14px;font-weight:700;max-width:92px;overflow:hidden;text-overflow:ellipsis}
+thead .tot{display:block;font-size:34px}
+thead th.first .tot{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+td .d{display:block;font-size:26px;font-family:"Caveat","Bradley Hand",cursive;font-weight:700;color:var(--ink);line-height:1}
+.neg, td .d.neg{color:var(--red)}
+td .bm{display:block;font-size:12px;color:var(--ink-soft)}
+.empty{padding:18px 14px;color:var(--ink-soft);font-size:15px}
+.podium .row .rank{font-size:34px;width:34px;flex:none}
+.podium .row .pts{font-size:38px;flex:none}
+.home{max-width:520px;margin:0 auto;padding:18px 16px calc(28px + env(safe-area-inset-bottom));text-align:center}
+.home a{color:var(--ink-soft);font-size:14px;text-decoration:none;border-bottom:1px dashed var(--ink-soft);padding-bottom:1px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav class="home"><a href="/">&larr; toutes les apps</a></nav>
+<script>
+(function(){
+  var KEY = 'rikiki-v1'; // unchanged so a game in progress survives updates
+  var app = document.getElementById('app');
+  var armed = false;
+
+  function fresh(){
+    return {phase:'setup', players:['','','',''],
+      cfg:{max:null, down:true, bonus:10, per:2, pen:2, forbid:true}, rounds:[], cur:null};
+  }
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return null;
+      var s = JSON.parse(raw);
+      if(!s || !s.players || !s.cfg || !s.rounds) return null;
+      if(s.phase==='play'){ s.phase='tricks'; if(s.cur) s.cur.made = s.cur.bids.slice(); }
+      return s;
+    }catch(e){ return null; }
+  }
+  // State lives on this device only. localStorage can throw or come back empty
+  // (private browsing, cleared site data), so every access is guarded and the
+  // app must stay usable when it fails.
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+  }
+
+  var S = load() || fresh();
+  if(S.phase!=='setup' && !S.id) S.id = 'g'+Date.now();
+
+  // Rolling buffer of the last 5 games, newest first. Separate key so a corrupt game can't take it down.
+  var HKEY = 'rikiki-history-v1', HMAX = 5, armedH = false;
+  var MEMH = null;
+  function loadHistory(){
+    if(MEMH) return MEMH;
+    try{ var a = JSON.parse(localStorage.getItem(HKEY) || '[]'); MEMH = Array.isArray(a) ? a : []; }catch(e){ MEMH = []; }
+    return MEMH;
+  }
+  function archive(finished){
+    if(!S.id || !S.rounds.length) return;
+    var H = loadHistory().filter(function(g){ return g.id !== S.id; });
+    H.unshift({id:S.id, ts:Date.now(), finished:!!finished, players:S.players.slice(),
+               cfg:{bonus:S.cfg.bonus, per:S.cfg.per, pen:S.cfg.pen}, rounds:JSON.parse(JSON.stringify(S.rounds))});
+    MEMH = H.slice(0, HMAX);
+    try{ localStorage.setItem(HKEY, JSON.stringify(MEMH)); }catch(e){}
+  }
+  function when(ts){
+    try{ return new Date(ts).toLocaleString('fr-BE', {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}); }
+    catch(e){ return new Date(ts).toDateString(); }
+  }
+  function viewHistory(){
+    var inGame = S.phase!=='setup';
+    var H = loadHistory().filter(function(g){ return !(inGame && g.id===S.id); });
+    var h = '<div class="sheethead"><h2 class="disp">Dernières parties</h2>'+(H.length?'<button class="mini danger" data-act="clearh">'+(armedH?'Confirmer':'Effacer')+'</button>':'')+'</div>'+
+            '<p class="sub" style="margin:0 2px 8px">Tout est enregistré sur cet appareil uniquement. Effacer les données du navigateur efface la partie et l’historique.</p>';
+    if(!H.length) return h + '<div class="sheet"><div class="empty">Aucune partie enregistrée pour l’instant. Les 5 dernières s’affichent ici.</div></div>';
+    H.forEach(function(g){
+      var t = totals(g), order = g.players.map(function(_,i){return i;}).sort(function(a,b){ return t[b]-t[a]; });
+      var line = order.map(function(i){ return esc(g.players[i])+' '+t[i]; }).join(', ');
+      h += '<details class="past"><summary><span class="pd">'+esc(when(g.ts))+(g.finished?'':' (arrêtée)')+'</span><span class="pl">'+line+'</span></summary>'+
+           '<div class="sheet">'+tableBody(g, false)+'</div></details>';
+    });
+    return h;
+  }
+
+  function esc(t){ return String(t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function sum(a){ return a.reduce(function(x,y){ return x+y; }, 0); }
+  function sign(n){ return n>0 ? '+'+n : (n<0 ? '−'+Math.abs(n) : '0'); }
+  function plural(n, one, many){ return n+' '+(n>1?many:one); }
+
+  function hardMax(n){ return Math.floor(52/n); }
+  function autoMax(n){ return Math.min(10, Math.floor(51/n)); }
+  function maxCards(){
+    var n = S.players.length, m = S.cfg.max==null ? autoMax(n) : S.cfg.max;
+    return Math.max(1, Math.min(m, hardMax(n)));
+  }
+  function seq(){
+    var m = maxCards(), a = [], i;
+    for(i=1;i<=m;i++) a.push(i);
+    if(S.cfg.down) for(i=m-1;i>=1;i--) a.push(i);
+    return a;
+  }
+  function points(bid, made, cfg){ cfg = cfg || S.cfg; return bid===made ? cfg.bonus + cfg.per*made : -cfg.pen*Math.abs(bid-made); }
+  function totals(g){
+    g = g || S;
+    var t = g.players.map(function(){ return 0; });
+    g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ t[i] += points(b, r.made[i], g.cfg); }); });
+    return t;
+  }
+  function roundInfo(){
+    var i = S.rounds.length, n = S.players.length, s = seq();
+    var dealer = i % n, order = [];
+    for(var k=1;k<=n;k++) order.push((dealer+k)%n);
+    return {idx:i, count:s.length, cards:s[i], dealer:dealer, order:order};
+  }
+  function zeros(){ return S.players.map(function(){return 0;}); }
+  function newCur(){ return {bids:zeros(), made:zeros()}; }
+
+  var ICON_MINUS = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>';
+  var ICON_PLUS  = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>';
+  // skip = a value the stepper may never land on (the dealer's forbidden bid)
+  function nextAllowed(v, d, min, max, skip){
+    var n = v + d; if(n===skip) n += d;
+    return (n<min || n>max) ? null : n;
+  }
+  function stepper(kind, i, v, min, max, skip){
+    if(skip==null) skip = -99;
+    return '<div class="step">'+
+      '<button data-act="dec" data-kind="'+kind+'" data-i="'+i+'" aria-label="Moins"'+(nextAllowed(v,-1,min,max,skip)==null?' disabled':'')+'>'+ICON_MINUS+'</button>'+
+      '<span class="val disp" aria-live="polite">'+v+'</span>'+
+      '<button data-act="inc" data-kind="'+kind+'" data-i="'+i+'" aria-label="Plus"'+(nextAllowed(v,1,min,max,skip)==null?' disabled':'')+'>'+ICON_PLUS+'</button>'+
+    '</div>';
+  }
+  // The dealer's forbidden bid for the current round, or null when nothing is forbidden.
+  function forbiddenBid(R){
+    if(!S.cfg.forbid) return null;
+    var f = R.cards - (sum(S.cur.bids) - S.cur.bids[R.dealer]);
+    return (f>=0 && f<=R.cards) ? f : null;
+  }
+  // Never leave the dealer sitting on the forbidden number.
+  function fixDealer(R){
+    var f = forbiddenBid(R), b = S.cur.bids;
+    if(f!=null && b[R.dealer]===f) b[R.dealer] = (f+1<=R.cards) ? f+1 : f-1;
+  }
+
+  function viewSetup(){
+    var n = S.players.length, h = '';
+    h += '<div class="top"><h1 class="disp">Rikiki</h1><span class="sub">feuille de score</span></div>';
+    h += '<h2 class="disp">Qui joue ?</h2><div class="sheet players">';
+    S.players.forEach(function(p,i){
+      h += '<div class="row"><input type="text" autocomplete="off" autocapitalize="words" maxlength="14" data-name="'+i+'" value="'+esc(p)+'" placeholder="Joueur '+(i+1)+'" aria-label="Nom du joueur '+(i+1)+'">'+
+        (n>2 ? '<button class="x" data-act="rm" data-i="'+i+'" aria-label="Retirer ce joueur">×</button>' : '')+'</div>';
+    });
+    h += '</div><p class="sub" style="margin:10px 2px">Le premier de la liste donne la première manche, puis ça tourne.</p>';
+    if(n<7) h += '<div class="btns"><button class="btn ghost" data-act="add">Ajouter un joueur</button></div>';
+
+    h += '<details'+(S.cfg._open?' open':'')+'><summary>Règles de la partie</summary><div class="sheet" style="margin-top:8px">';
+    h += '<div class="row opt"><div class="who"><div class="name">Cartes au maximum</div><div class="note">'+plural(seq().length,'manche','manches')+' au total</div></div>'+stepper('max',0,maxCards(),1,hardMax(n))+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">Monter puis redescendre</div></div><button class="toggle" data-act="tog" data-k="down" aria-pressed="'+S.cfg.down+'" aria-label="Monter puis redescendre"></button></div>';
+    h += '<div class="row opt"><div class="who"><div class="name">Pari interdit pour le donneur</div><div class="note">Le total des paris ne peut pas égaler le nombre de cartes</div></div><button class="toggle" data-act="tog" data-k="forbid" aria-pressed="'+S.cfg.forbid+'" aria-label="Pari interdit pour le donneur"></button></div>';
+    h += '<div class="row opt"><div class="who"><div class="name">Points si pari réussi</div></div>'+stepper('bonus',0,S.cfg.bonus,0,50)+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">Points par pli gagné</div></div>'+stepper('per',0,S.cfg.per,0,20)+'</div>';
+    h += '<div class="row opt"><div class="who"><div class="name">Points perdus par pli d’écart</div></div>'+stepper('pen',0,S.cfg.pen,0,20)+'</div>';
+    h += '</div></details>';
+    h += '<div class="btns" style="margin-top:22px"><button class="btn" data-act="start">Commencer la partie</button></div>';
+    h += viewHistory();
+    return h;
+  }
+
+  function viewTable(){
+    var h = '';
+    var stack = S.cfg.stack !== false;
+    h += '<div class="sheethead"><h2 class="disp">La feuille</h2>'+
+         (S.rounds.length>1 ? '<button class="mini" data-act="order" aria-label="Changer l’ordre des manches">'+(stack?'Dernière manche en haut':'Première manche en haut')+' ⇅</button>' : '')+
+         '</div><div class="sheet">';
+    if(!S.rounds.length) return h + '<div class="empty">Les manches jouées s’inscrivent ici. Sous chaque score : pari / plis faits.</div></div>';
+    return h + tableBody(S, stack) + '</div>';
+  }
+  function tableBody(g, stack){
+    var t = totals(g), best = Math.max.apply(null, t), h = '';
+    h += '<div class="scroll"><table><thead><tr><th scope="col">Manche</th>';
+    g.players.forEach(function(p,i){
+      h += '<th scope="col" class="'+(t[i]===best?'first':'')+'">'+esc(p)+'<span class="tot disp'+(t[i]<0?' neg':'')+'">'+t[i]+'</span></th>';
+    });
+    h += '</tr></thead><tbody>';
+    var list = g.rounds.map(function(r,k){ return {r:r,k:k}; });
+    if(stack) list.reverse();
+    list.forEach(function(o){
+      var r = o.r;
+      h += '<tr><td>'+(o.k+1)+'<span class="bm">'+plural(r.cards,'carte','cartes')+'</span></td>';
+      r.bids.forEach(function(b,i){
+        var d = points(b, r.made[i], g.cfg);
+        h += '<td><span class="d'+(d<0?' neg':'')+'">'+sign(d)+'</span><span class="bm">'+b+' / '+r.made[i]+'</span></td>';
+      });
+      h += '</tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function phases(now){
+    var names = ['1. Annoncé','2. Réalisé'], idx = {bids:0, tricks:1}[now], h = '<ol class="phases'+(idx===1?' p2':'')+'">';
+    names.forEach(function(nm,k){ h += '<li class="'+(k<idx?'done':k===idx?'now':'')+'"'+(k===idx?' aria-current="step"':'')+'>'+nm+'</li>'; });
+    return h + '</ol>';
+  }
+
+  function viewGame(){
+    var R = roundInfo(), c = S.cur, ph = S.phase, h = '';
+    var dealer = esc(S.players[R.dealer]), first = esc(S.players[R.order[0]]);
+    h += '<div class="top"><span class="disp brand">Rikiki</span><span class="sub">Manche '+(R.idx+1)+' sur '+R.count+'</span></div>';
+    h += '<div class="round"><div class="cards disp">'+plural(R.cards,'carte','cartes')+'</div>'+
+         '<div class="meta"><b>'+dealer+'</b> donne<br><b>'+first+'</b> commence</div></div>';
+    h += phases(ph);
+
+    var totalBids = sum(c.bids), ok = true, msg = '', mcls = '', cta = '', act = '';
+
+    if(ph==='bids'){
+      fixDealer(R);
+      totalBids = sum(c.bids);
+      var forbidden = forbiddenBid(R);
+      h += '<p class="lead disp">Plis annoncés</p><div class="sheet">';
+      R.order.forEach(function(i){
+        var note = '', isDealer = i===R.dealer;
+        if(isDealer && S.cfg.forbid){
+          note = forbidden!=null ? '<span class="ban">interdit : '+forbidden+'</span>' : '<span class="free">donneur, tout est permis</span>';
+        }else if(isDealer){ note = 'donneur, annonce en dernier'; }
+        h += '<div class="row'+(isDealer?' dealer':'')+'"><div class="who"><div class="name">'+esc(S.players[i])+'</div><div class="note">'+note+'</div></div>'+stepper('bid',i,c.bids[i],0,R.cards,isDealer?forbidden:null)+'</div>';
+      });
+      h += '</div>';
+      ok = !(S.cfg.forbid && totalBids===R.cards);
+      msg = ok ? 'Total des paris : '+totalBids+' pour '+plural(R.cards,'carte','cartes')+'.' : 'Le total ne peut pas faire '+R.cards+'. '+dealer+' doit changer son pari.';
+      if(!ok) mcls='bad';
+      cta = 'Valider les annonces'; act = 'lock';
+    }
+    else{
+      var made = sum(c.made), diff = R.cards - made; ok = diff===0;
+      h += '<p class="lead disp">Plis réalisés</p><div class="sheet p2">';
+      R.order.forEach(function(i){
+        var p = points(c.bids[i], c.made[i]);
+        var res = '<span class="note '+(p<0?'bad':'good')+'">'+sign(p)+' pts</span>';
+        h += '<div class="row"><div class="who"><div class="name">'+esc(S.players[i])+'</div><div class="note"><span class="chip">annoncé '+c.bids[i]+'</span>'+res+'</div></div>'+stepper('made',i,c.made[i],0,R.cards)+'</div>';
+      });
+      h += '</div>';
+      msg = ok ? 'Le compte est bon.' : (diff>0 ? 'Partez des annonces et corrigez. Encore '+plural(diff,'pli','plis')+' à attribuer sur '+R.cards+'.' : plural(-diff,'pli','plis')+' en trop.');
+      mcls = ok ? 'ok' : 'bad';
+      cta = 'Valider la manche'; act = 'score';
+    }
+
+    if(msg) h += '<p class="status '+mcls+'" role="status">'+msg+'</p>';
+    h += '<div class="btns"><button class="btn" data-act="'+act+'"'+(ok?'':' disabled')+'>'+cta+'</button></div>';
+    h += viewTable();
+    h += '<div class="btns two" style="margin-top:16px">'+
+         '<button class="btn ghost" data-act="back"'+((ph==='bids' && !S.rounds.length)?' disabled':'')+'>Revenir en arrière</button>'+
+         '<button class="btn danger" data-act="quit">'+(armed?'Confirmer : arrêter':'Arrêter la partie')+'</button></div>';
+    h += viewHistory();
+    return h;
+  }
+
+  function viewDone(){
+    var t = totals(), order = S.players.map(function(_,i){return i;}).sort(function(a,b){ return t[b]-t[a]; }), h = '';
+    h += '<div class="top"><h1 class="disp">Fini !</h1><span class="sub">'+plural(S.rounds.length,'manche','manches')+'</span></div>';
+    h += '<h2 class="disp">Classement</h2><div class="sheet podium">';
+    var rank = 0, prev = null;
+    order.forEach(function(i,k){
+      if(t[i]!==prev){ rank = k+1; prev = t[i]; }
+      h += '<div class="row"><span class="rank disp">'+rank+'</span><div class="who"><div class="name">'+esc(S.players[i])+'</div></div><span class="pts disp'+(t[i]<0?' neg':'')+'">'+t[i]+'</span></div>';
+    });
+    h += '</div>' + viewTable();
+    h += '<div class="btns" style="margin-top:18px"><button class="btn" data-act="again">Rejouer avec les mêmes joueurs</button>'+
+         '<button class="btn ghost" data-act="back">Corriger la dernière manche</button>'+
+         '<button class="btn ghost" data-act="setup">Changer les joueurs ou les règles</button></div>';
+    h += viewHistory();
+    return h;
+  }
+
+  function render(){
+    app.innerHTML = S.phase==='setup' ? viewSetup() : S.phase==='done' ? viewDone() : viewGame();
+    save();
+  }
+
+  function bump(kind, i, d){
+    if(kind==='bid' || kind==='made'){
+      var R = roundInfo(), arr = kind==='bid' ? S.cur.bids : S.cur.made;
+      if(kind==='bid'){
+        var skip = (i===R.dealer) ? forbiddenBid(R) : null;
+        var n = nextAllowed(arr[i], d, 0, R.cards, skip==null ? -99 : skip);
+        if(n!=null) arr[i] = n;
+        fixDealer(R);
+      }else{
+        arr[i] = Math.max(0, Math.min(R.cards, arr[i]+d));
+      }
+    }else if(kind==='max'){
+      S.cfg.max = Math.max(1, Math.min(hardMax(S.players.length), maxCards()+d));
+    }else{
+      S.cfg[kind] = Math.max(0, Math.min(kind==='bonus'?50:20, S.cfg[kind]+d));
+    }
+  }
+
+  document.addEventListener('input', function(e){
+    var i = e.target.getAttribute && e.target.getAttribute('data-name');
+    if(i!=null){ S.players[+i] = e.target.value; save(); }
+  });
+  document.addEventListener('toggle', function(e){
+    if(e.target.tagName==='DETAILS' && !e.target.classList.contains('past')){ S.cfg._open = e.target.open; save(); }
+  }, true);
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-act]');
+    if(!b || b.disabled) return;
+    var act = b.getAttribute('data-act'), i = +b.getAttribute('data-i'), top = false;
+    if(act!=='quit') armed = false;
+    if(act!=='clearh') armedH = false;
+
+    switch(act){
+      case 'inc': bump(b.getAttribute('data-kind'), i, 1); break;
+      case 'dec': bump(b.getAttribute('data-kind'), i, -1); break;
+      case 'add': if(S.players.length<7) S.players.push(''); break;
+      case 'rm':  if(S.players.length>2) S.players.splice(i,1); break;
+      case 'order': S.cfg.stack = (S.cfg.stack === false); break;
+      case 'tog': var k = b.getAttribute('data-k'); S.cfg[k] = !S.cfg[k]; break;
+      case 'start':
+        S.players = S.players.map(function(p,j){ return p.trim() || 'Joueur '+(j+1); });
+        S.cfg.max = maxCards(); S.rounds = []; S.cur = newCur(); S.phase = 'bids'; S.id = 'g'+Date.now(); top = true; break;
+      case 'lock': S.cur.made = S.cur.bids.slice(); S.phase = 'tricks'; top = true; break;
+      case 'score':
+        var R = roundInfo();
+        if(sum(S.cur.made)!==R.cards) break;
+        S.rounds.push({cards:R.cards, dealer:R.dealer, bids:S.cur.bids.slice(), made:S.cur.made.slice()});
+        if(S.rounds.length>=R.count){ S.phase='done'; S.cur=null; archive(true); } else { S.cur = newCur(); S.phase='bids'; archive(false); }
+        top = true; break;
+      case 'back':
+        if(S.phase==='tricks') S.phase='bids';
+        else if(S.rounds.length){ var last = S.rounds.pop(); S.cur = {bids:last.bids, made:last.made}; S.phase='tricks'; }
+        top = true; break;
+      case 'quit':
+        if(!armed) armed = true;
+        else { armed = false; archive(false); S.phase='setup'; S.rounds=[]; S.cur=null; S.id=null; top = true; }
+        break;
+      case 'again': S.rounds=[]; S.cur=newCur(); S.phase='bids'; S.id='g'+Date.now(); top = true; break;
+      case 'clearh': if(!armedH) armedH = true; else { armedH = false; MEMH = []; try{ localStorage.removeItem(HKEY); }catch(e){} } break;
+      case 'setup': S.phase='setup'; S.rounds=[]; S.cur=null; S.id=null; top = true; break;
+    }
+    render();
+    if(top) window.scrollTo(0,0);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

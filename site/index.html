@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>jnssn.io apps</title>
+<meta name="description" content="Small self-contained things, made on a phone.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FBFBF6;--grid:#D9E4F2;--ink:#1B3A9C;--ink-soft:#5B6FA8;--red:#C4202B;--pencil:#3A3D45;--fill:#EAF0FB;--on-ink:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#0F1626;--grid:#1B2740;--ink:#AFC4FF;--ink-soft:#7F93C8;--red:#FF7B7B;--pencil:#E4E8F2;--fill:#18233C;--on-ink:#0F1626}}
+:root[data-theme="dark"]{--paper:#0F1626;--grid:#1B2740;--ink:#AFC4FF;--ink-soft:#7F93C8;--red:#FF7B7B;--pencil:#E4E8F2;--fill:#18233C;--on-ink:#0F1626}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--pencil);background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px;min-height:100vh;line-height:1.45;font-size:16px;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:520px;margin:0 auto;padding:calc(28px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom))}
+.disp{font-family:"Caveat","Bradley Hand","Segoe Script",cursive;font-weight:700;color:var(--ink);line-height:1}
+h1{font-size:52px}
+.tagline{color:var(--ink-soft);font-size:16px;margin:8px 2px 26px}
+.sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
+a.card{display:flex;align-items:center;gap:14px;padding:16px 14px;border-top:1px solid var(--grid);text-decoration:none;color:inherit}
+a.card:first-child{border-top:0}
+a.card:active{background:var(--fill)}
+.icon{font-size:26px;width:34px;text-align:center;flex:none;line-height:1}
+.body{min-width:0;flex:1}
+.t{display:block;font-weight:700;font-size:18px;color:var(--ink);line-height:1.25}
+.d{display:block;font-size:14px;color:var(--ink-soft);margin-top:3px;line-height:1.35}
+.arrow{color:var(--ink-soft);font-size:20px;flex:none}
+.empty{padding:22px 16px;color:var(--ink-soft)}
+.note{margin:22px 2px 0;font-size:13.5px;color:var(--ink-soft)}
+.mid{text-align:center;padding-top:8vh}
+.mid h1{font-size:46px}
+.mid p{margin:16px auto 0;max-width:34ch;color:var(--ink-soft)}
+.back{display:inline-block;margin-top:26px;border:1.5px solid var(--ink);border-radius:6px;padding:13px 22px;color:var(--ink);text-decoration:none;font-weight:700}
+a:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1 class="disp">jnssn.io apps</h1>
+<p class="tagline">Small self-contained things, made on a phone.</p>
+<div class="sheet">
+  <a class="card" href="/rikiki/">
+    <span class="icon" aria-hidden="true">♠</span>
+    <span class="body"><span class="t">Rikiki</span><span class="d">Feuille de score pour le jeu de cartes Rikiki : paris, plis, points et historique des parties.</span></span>
+    <span class="arrow" aria-hidden="true">→</span>
+  </a>
+</div>
+<p class="note">Everything here runs entirely in your browser. Nothing you type leaves the device.</p>
+</main>
+</body>
+</html>

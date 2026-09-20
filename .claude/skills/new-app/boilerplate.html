@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>APP TITLE</title>
+<meta name="description" content="One line describing what this does.">
+<meta name="color-scheme" content="light dark">
+<style>
+/* Light is the default; dark overrides both via the media query and an explicit
+   data-theme, so the page is correct however the theme is decided. */
+:root{
+  --paper:#FBFBF6; --grid:#D9E4F2; --ink:#1B3A9C; --ink-soft:#5B6FA8;
+  --red:#C4202B; --pencil:#3A3D45; --fill:#EAF0FB; --on-ink:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --grid:#1B2740; --ink:#AFC4FF; --ink-soft:#7F93C8;
+    --red:#FF7B7B; --pencil:#E4E8F2; --fill:#18233C; --on-ink:#0F1626;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --grid:#1B2740; --ink:#AFC4FF; --ink-soft:#7F93C8;
+  --red:#FF7B7B; --pencil:#E4E8F2; --fill:#18233C; --on-ink:#0F1626;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--pencil);background:var(--paper);
+  min-height:100vh;line-height:1.45;font-size:16px;-webkit-tap-highlight-color:transparent;
+}
+#app{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px 8px}
+h1{font-size:30px;color:var(--ink);line-height:1.1}
+.sub{color:var(--ink-soft);font-size:15px;margin-top:6px}
+.sheet{background:var(--paper);border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;margin-top:22px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px;border-top:1px solid var(--grid)}
+.row:first-child{border-top:0}
+/* 46px keeps every control inside a comfortable thumb target. */
+.btn{display:block;width:100%;padding:15px 16px;margin-top:12px;border-radius:6px;cursor:pointer;
+  font:700 17px/1.2 system-ui,sans-serif;border:1.5px solid var(--ink);background:var(--ink);color:var(--on-ink)}
+.btn.ghost{background:var(--paper);color:var(--ink)}
+.btn:disabled{opacity:.35;cursor:default}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--ink-soft);outline-offset:2px}
+.home{max-width:520px;margin:0 auto;padding:18px 16px calc(28px + env(safe-area-inset-bottom));text-align:center}
+.home a{color:var(--ink-soft);font-size:14px;text-decoration:none;border-bottom:1px dashed var(--ink-soft)}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav class="home"><a href="/">&larr; all apps</a></nav>
+<script>
+(function(){
+  var KEY = 'SLUG-v1';   // bump the suffix only when old saved state can no longer be read
+  var app = document.getElementById('app');
+
+  function fresh(){ return {count:0}; }
+
+  // localStorage throws in private browsing and returns null once site data is
+  // cleared, so every access is guarded and the app works without it.
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return null;
+      var s = JSON.parse(raw);
+      return (s && typeof s === 'object') ? s : null;
+    }catch(e){ return null; }
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+  var S = load() || fresh();
+
+  function esc(t){ return String(t).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function render(){
+    app.innerHTML =
+      '<h1>APP TITLE</h1>' +
+      '<p class="sub">One line describing what this does.</p>' +
+      '<div class="sheet"><div class="row"><span>Count</span><strong>'+esc(S.count)+'</strong></div></div>' +
+      '<button class="btn" data-act="inc">Add one</button>' +
+      '<button class="btn ghost" data-act="reset">Start over</button>';
+    save();
+  }
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-act]');
+    if(!b || b.disabled) return;
+    switch(b.getAttribute('data-act')){
+      case 'inc': S.count++; break;
+      case 'reset': S = fresh(); break;
+    }
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

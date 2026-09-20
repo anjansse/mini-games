@@ -1,0 +1,5 @@
+# Build output. Cloudflare Pages regenerates this on every deploy.
+dist/
+
+.DS_Store
+node_modules/

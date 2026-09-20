@@ -1,0 +1,14 @@
+{
+  "$comment": "Single source of truth for routing and flags. Set enabled:false to take an app offline; its slug then serves the 'switched off' page instead of 404. Array order is the order on the landing page.",
+  "site": {
+    "title": "jnssn.io apps",
+    "tagline": "Small self-contained things, made on a phone.",
+    "domain": "apps.jnssn.io"
+  },
+  "apps": [
+    {
+      "slug": "rikiki",
+      "enabled": true
+    }
+  ]
+}
