@@ -260,6 +260,7 @@ a.applink[hidden]{display:none}
 
 .note{margin:22px 2px 0;font-size:13px;color:var(--faint);line-height:1.5}
 .find{margin-bottom:12px}
+.install{margin-top:18px}
 
 /* 404, offline and the switched-off page. */
 .mid{text-align:center;padding-top:10vh}
@@ -320,6 +321,17 @@ ${LANG_TOGGLE_JS}
 </html>
 `;
 }
+
+const INSTALL_STRINGS = {
+  en: { title: 'Keep this on your phone',
+        ios: 'Tap the Share button {share} at the bottom of the screen, then choose \u201cAdd to Home Screen\u201d. It will work without internet.',
+        gen: 'Add it to your Home Screen and it will work without internet.',
+        add: 'Add to Home Screen', close: 'Not now' },
+  fr: { title: 'Gardez-le sur votre téléphone',
+        ios: 'Touchez le bouton Partager {share} en bas de l\u2019écran, puis choisissez «\u00a0Sur l\u2019écran d\u2019accueil\u00a0». Il fonctionnera sans internet.',
+        gen: 'Ajoutez-le à votre écran d\u2019accueil et il fonctionnera sans internet.',
+        add: 'Ajouter à l\u2019écran d\u2019accueil', close: 'Plus tard' },
+};
 
 /* ---------- landing page ---------- */
 
@@ -384,10 +396,31 @@ const filterJs = FILTER_ON ? `
   label();
 })();` : '';
 
+/* A standing way in, rather than only the banner. The banner asks once and a
+   dismissal used to be final, which is the actual reason someone never ends up
+   installing it. This button appears whenever installing is possible and does
+   the most the platform allows: one tap on Android, the Share instructions on
+   iOS, where no install API exists. */
+const installJsLanding = `
+(function(){
+  var b=document.getElementById('install'); if(!b) return;
+  var S=${JSON.stringify(INSTALL_STRINGS)};
+  function lang(){ return (window.JLang&&window.JLang.get())||document.documentElement.lang||'${DEFAULT_LANG}'; }
+  function paint(){
+    var ok = window.JInstall && window.JInstall.can();
+    b.hidden = !ok;
+    if(ok) b.textContent=(S[lang()]||S.en).add;
+  }
+  b.addEventListener('click',function(){ if(window.JInstall) window.JInstall.show(); });
+  document.addEventListener('jinstallchange', paint);
+  window.addEventListener('jlangchange', paint);
+  paint();
+})();`;
+
 const landing = page({
   title: SITE_TITLE[DEFAULT_LANG],
   description: SITE_TAGLINE[DEFAULT_LANG],
-  extraJs: filterJs,
+  extraJs: filterJs + installJsLanding,
   body: `<div class="head">
   <h1>${ml('span', SITE_TITLE)}</h1>
   <div class="seg" id="langslot" role="group" aria-label="Language"></div>
@@ -397,6 +430,7 @@ ${filterMarkup}<div class="card list" id="list">
 ${cards}
 </div>
 <p class="empty" id="none" hidden>${esc(NONE[DEFAULT_LANG])}</p>
+<button class="btn ghost install" id="install" hidden></button>
 <p class="note">${ml('span', NOTE)}</p>`,
 });
 
@@ -505,16 +539,6 @@ const INSTALL_CSS = `
 @media (prefers-reduced-motion:reduce){.jpwa{transition:none}}
 `.trim();
 
-const INSTALL_STRINGS = {
-  en: { title: 'Keep this on your phone',
-        ios: 'Tap the Share button {share} at the bottom of the screen, then choose \u201cAdd to Home Screen\u201d. It will work without internet.',
-        gen: 'Add it to your Home Screen and it will work without internet.',
-        add: 'Add to Home Screen', close: 'Not now' },
-  fr: { title: 'Gardez-le sur votre téléphone',
-        ios: 'Touchez le bouton Partager {share} en bas de l\u2019écran, puis choisissez «\u00a0Sur l\u2019écran d\u2019accueil\u00a0». Il fonctionnera sans internet.',
-        gen: 'Ajoutez-le à votre écran d\u2019accueil et il fonctionnera sans internet.',
-        add: 'Ajouter à l\u2019écran d\u2019accueil', close: 'Plus tard' },
-};
 
 function installJs(iconHref, nameByLang) {
   return `
@@ -523,13 +547,15 @@ function installJs(iconHref, nameByLang) {
   var KEY='jnssn-a2hs', S=${JSON.stringify(INSTALL_STRINGS)}, NAME=${JSON.stringify(nameByLang)};
   function lang(){ return (window.JLang && window.JLang.get()) || document.documentElement.lang || 'en'; }
   function tx(k){ return (S[lang()]||S.en)[k]; }
-  // Already installed, or previously dismissed: never ask again.
   var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-  if(standalone) return;
-  try{ if(localStorage.getItem(KEY)==='no') return; }catch(e){}
 
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
            || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+
+  // Dismissing suppresses the UNPROMPTED banner, not the feature. A page can
+  // still call JInstall.show() from a button the player went looking for —
+  // before, "Not now" was permanent and there was no way back to it.
+  function dismissed(){ try{ return localStorage.getItem(KEY)==='no'; }catch(e){ return false; } }
   var deferred=null, el=null;
   var SHARE='<svg class="jpwa-sh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 12v7a1 1 0 001 1h12a1 1 0 001-1v-7"/></svg>';
 
@@ -565,10 +591,44 @@ function installJs(iconHref, nameByLang) {
     window.addEventListener('jlangchange', paint);
   }
 
-  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred=e; show(); });
-  window.addEventListener('appinstalled', dismiss);
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); deferred=e;
+    announce();
+    if(!standalone && !dismissed()) show();
+  });
+  window.addEventListener('appinstalled', function(){ standalone=true; dismiss(); announce(); });
   // Let the page settle first, so this never competes with first paint.
-  if(isIOS) setTimeout(show, 2500);
+  if(isIOS && !standalone && !dismissed()) setTimeout(show, 2500);
+
+  /* The page-facing API. A game or the index can offer a button that works
+     whenever installing is possible at all, however the banner went.
+
+     On Android this fires the real prompt and installs in one tap. On iOS
+     there is no install API — Safari has never shipped beforeinstallprompt —
+     so the most any button can do is show the player the Share glyph and
+     where it is. Do not promise a one-tap install on iOS; it does not exist. */
+  function announce(){
+    document.dispatchEvent(new CustomEvent('jinstallchange'));
+  }
+  window.JInstall = {
+    installed: function(){ return standalone; },
+    // True when there is something a button can usefully do.
+    can: function(){ return !standalone && (!!deferred || isIOS); },
+    // One tap on Android; the instructions on iOS.
+    show: function(){
+      if(standalone) return;
+      if(deferred){
+        var d=deferred; deferred=null;
+        d.prompt();
+        d.userChoice.then(announce, announce);
+        return;
+      }
+      // Force it open even if the banner was dismissed before.
+      if(el){ el.classList.add('on'); return; }
+      show();
+    }
+  };
+  announce();
 })();
 </script>`;
 }

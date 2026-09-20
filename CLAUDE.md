@@ -179,6 +179,18 @@ find it; on Android it captures the real prompt and offers a one-tap button. It
 asks once, remembers a dismissal under `jnssn-a2hs`, and never appears once the
 app is installed.
 
+A dismissal suppresses the **banner**, not the feature. The build also exposes
+`window.JInstall` — `can()`, `show()`, `installed()`, plus a `jinstallchange`
+event — and the landing page carries a standing button built on it. Before that,
+one tap on "Not now" removed the only route to installing, permanently, which is
+the actual reason someone never ends up with the app on their phone.
+
+**There is no way to install from a button on iOS.** Safari has never
+implemented `beforeinstallprompt` or any programmatic install; `JInstall.show()`
+can only display the Share instructions there. Do not write UI copy promising a
+one-tap install — on Android it is true, on iPhone it is not, and iPhone is the
+platform these are played on.
+
 Add to Home Screen from Safari gives a real offline app. Installed web apps are
 also exempt from iOS's 7-day storage eviction, so saved games survive there when
 they would not in a plain tab.

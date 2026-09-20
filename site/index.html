@@ -349,6 +349,7 @@ a.applink[hidden]{display:none}
 
 .note{margin:22px 2px 0;font-size:13px;color:var(--faint);line-height:1.5}
 .find{margin-bottom:12px}
+.install{margin-top:18px}
 
 /* 404, offline and the switched-off page. */
 .mid{text-align:center;padding-top:10vh}
@@ -406,6 +407,7 @@ html[lang="fr"] [data-l]:not([data-l="fr"]){display:none}
   </a>
 </div>
 <p class="empty" id="none" hidden>Nothing matches that.</p>
+<button class="btn ghost install" id="install" hidden></button>
 <p class="note"><span data-l="en">Everything here runs entirely in your browser. Nothing you type leaves the device. Add a game to your Home Screen and it works with no signal.</span><span data-l="fr">Tout fonctionne entièrement dans votre navigateur. Rien de ce que vous tapez ne quitte l’appareil. Ajoutez un jeu à l’écran d’accueil et il marche sans réseau.</span></p>
 </main>
 <script>
@@ -423,6 +425,21 @@ document.addEventListener('click',function(e){
   var slot=document.getElementById('langslot');
   if(slot) slot.innerHTML=langBar();
   window.addEventListener('jlangchange',function(){ if(slot) slot.innerHTML=langBar(); });
+})();
+
+(function(){
+  var b=document.getElementById('install'); if(!b) return;
+  var S={"en":{"title":"Keep this on your phone","ios":"Tap the Share button {share} at the bottom of the screen, then choose “Add to Home Screen”. It will work without internet.","gen":"Add it to your Home Screen and it will work without internet.","add":"Add to Home Screen","close":"Not now"},"fr":{"title":"Gardez-le sur votre téléphone","ios":"Touchez le bouton Partager {share} en bas de l’écran, puis choisissez « Sur l’écran d’accueil ». Il fonctionnera sans internet.","gen":"Ajoutez-le à votre écran d’accueil et il fonctionnera sans internet.","add":"Ajouter à l’écran d’accueil","close":"Plus tard"}};
+  function lang(){ return (window.JLang&&window.JLang.get())||document.documentElement.lang||'en'; }
+  function paint(){
+    var ok = window.JInstall && window.JInstall.can();
+    b.hidden = !ok;
+    if(ok) b.textContent=(S[lang()]||S.en).add;
+  }
+  b.addEventListener('click',function(){ if(window.JInstall) window.JInstall.show(); });
+  document.addEventListener('jinstallchange', paint);
+  window.addEventListener('jlangchange', paint);
+  paint();
 })();
 </script>
 </body>

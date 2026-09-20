@@ -178,6 +178,34 @@ catalogue feel unmaintained.
 | Announcements | `UI.live()` for state a sighted player reads but a blind one would not hear |
 | Installed PWA | `@media (display-mode: standalone)` adjusts the bar |
 
+### Offering "Add to Home Screen" from your own UI
+
+The build injects a `window.JInstall` into every page. Use it if your app wants
+its own button; the automatic banner already handles the default case.
+
+```js
+if (window.JInstall && JInstall.can()) {
+  btn.hidden = false;
+  btn.onclick = () => JInstall.show();
+}
+document.addEventListener('jinstallchange', repaint);  // fires when can() changes
+```
+
+| | |
+| --- | --- |
+| `JInstall.can()` | There is something useful a button can do right now |
+| `JInstall.show()` | One tap on Android; the Share instructions on iOS |
+| `JInstall.installed()` | Already running from the Home Screen |
+
+**Do not label it as a one-tap install.** On Android it really does install in
+one tap. **On iOS there is no install API at all** — Safari has never shipped
+`beforeinstallprompt`, so the most any button can do is show the player the
+Share glyph and where to find it. A button promising more than that is a lie on
+the platform most of these games are played on.
+
+Dismissing the banner suppresses the *banner*, not the feature: `JInstall.show()`
+still works afterwards, which is the whole point of offering a button.
+
 ### Changing the kit
 
 ```sh
