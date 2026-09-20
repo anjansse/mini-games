@@ -19,9 +19,51 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { iconSet, themeColor, GLYPHS, GLYPH_NAMES, defaultGlyph } from './icon.mjs';
+import { syncSource, isCurrent, uiVersion } from './ui.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK_ONLY = process.argv.includes('--check');
+const SYNC_UI = process.argv.includes('--sync-ui');
+
+/* ---------- --sync-ui ----------
+   Writes the UI kit from scripts/ui.mjs into every app and into the scaffold
+   boilerplate, then stops. This is the only thing that should ever edit the
+   fenced blocks; a normal build only checks they are current.
+
+   It runs before validation on purpose: an app whose copy is stale should be
+   fixable with one command rather than having to satisfy the validator first. */
+if (SYNC_UI) {
+  const targets = [];
+  const appsDir = join(ROOT, 'apps');
+  if (existsSync(appsDir)) {
+    for (const d of readdirSync(appsDir)) {
+      const f = join(appsDir, d, 'index.html');
+      if (existsSync(f)) targets.push({ file: f, slug: d, label: `apps/${d}/index.html` });
+    }
+  }
+  // The scaffold carries the kit too, so a new app starts current rather than
+  // stale on its first build. Its hue is a placeholder — the real one is
+  // written when the file is copied to apps/<slug>/.
+  const boiler = join(ROOT, '.claude', 'skills', 'new-app', 'boilerplate.html');
+  if (existsSync(boiler)) targets.push({ file: boiler, slug: null, label: '.claude/skills/new-app/boilerplate.html' });
+
+  let wrote = 0, skipped = 0;
+  for (const t of targets) {
+    const before = readFileSync(t.file, 'utf8');
+    const after = syncSource(before, t.slug);
+    if (after === null) {
+      console.warn(`  ! ${t.label}: no jnssn-ui sentinels; nothing to sync. Scaffold it from the boilerplate.`);
+      skipped++;
+      continue;
+    }
+    if (after === before) { skipped++; continue; }
+    writeFileSync(t.file, after);
+    console.log(`  ✓ ${t.label}`);
+    wrote++;
+  }
+  console.log(`\nUI kit ${uiVersion(null)} — ${wrote} file(s) updated, ${skipped} already current or unscaffolded.`);
+  process.exit(0);
+}
 
 const ALLOWED_HOSTS = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 const FORBIDDEN = [/window\.claude\b/, /claude\.use\s*\(/, /window\.storage\b/, /api\.anthropic\.com/];
@@ -109,6 +151,19 @@ for (const entry of config.apps) {
   const KB = Buffer.byteLength(source) / 1024;
   if (KB > 250) fail(`${slug}: index.html is ${KB.toFixed(0)} kB, over the 250 kB budget. Inline less, or split the work.`);
   else if (KB > 120) warnings.push(`${slug}: index.html is ${KB.toFixed(0)} kB; the 250 kB budget is close.`);
+
+  // The UI kit is inlined per app, which is what keeps the single-file rule and
+  // a bare `open apps/<slug>/index.html` both working — but it also means a
+  // hand-edit would silently fork the design system. This is the check that
+  // stops that. Absence is only a warning while apps are still being migrated;
+  // once every app carries the kit it becomes an error like the rest.
+  if (/jnssn-ui css/.test(source)) {
+    if (!isCurrent(source, slug)) {
+      fail(`${slug}: its copy of the UI kit has drifted from scripts/ui.mjs. Run \`node scripts/build.mjs --sync-ui\`, and put app-specific CSS outside the fenced block.`);
+    }
+  } else {
+    warnings.push(`${slug}: does not carry the shared UI kit. It will not pick up design changes; see CONTRIBUTING.md.`);
+  }
 
   const appLangs = meta.languages || [DEFAULT_LANG];
   if (appLangs.length > 1 && !/jnssn-lang/.test(source)) {

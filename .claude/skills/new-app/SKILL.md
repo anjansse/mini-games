@@ -27,10 +27,33 @@ different one, or ask whether to replace the existing app.
 
 ## 2. Scaffold
 
-Copy `.claude/skills/new-app/boilerplate.html` to `apps/<slug>/index.html` and
-build the app inside it. The boilerplate already carries the light/dark tokens,
-the phone-width layout, the guarded `localStorage` helpers and the link home —
-keep that structure and replace the demo content.
+Copy `.claude/skills/new-app/boilerplate.html` to `apps/<slug>/index.html`, then
+run `node scripts/build.mjs --sync-ui` so the kit picks up the slug's hue, and
+build the app inside it.
+
+The boilerplate already carries the shared UI kit, the app bar, two screens, a
+settings sheet, the guarded `localStorage` helpers and the link home — keep that
+structure and replace the demo content.
+
+**Three things not to undo:**
+
+- **Do not edit inside the `jnssn-ui` fences.** That block belongs to
+  `scripts/ui.mjs`; the build fails on drift and `--sync-ui` overwrites it. App
+  CSS goes below the fence, built from the tokens (`var(--accent)`,
+  `var(--surface)`, `var(--r)`), never fresh hex values.
+- **Do not rebuild screens with `innerHTML`.** Write the markup once in HTML and
+  patch what changes with `UI.setText` / `UI.setAttr`, as `paint()` shows.
+  Rebuilding loses focus, scroll and screen-reader context on every tap.
+- **Do not hand-roll a top bar, a modal or an icon.** Use `.appbar`,
+  `dialog.sheet` via `UI.openSheet`, and `UI.icon`. A game that invents its own
+  is how the catalogue stops looking like one product.
+
+The kit is documented in `CONTRIBUTING.md` under "The UI kit" — the component
+list, the runtime API, and the conventions it already handles so you do not
+re-solve them.
+
+If the app genuinely needs a component the kit lacks, add it to
+`scripts/ui.mjs` and run `--sync-ui`, so every app gets it.
 
 Write `apps/<slug>/meta.json`. The schema and the full field table are in
 `CONTRIBUTING.md`; the shape the build accepts is:

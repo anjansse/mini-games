@@ -39,6 +39,36 @@ A **disabled** app is not uploaded at all. Its slug still resolves, to a small
 
 Unknown paths get `dist/404.html`, which links back to the index.
 
+## The UI kit
+
+`scripts/ui.mjs` is the single source of truth for tokens, components, motion
+and the small runtime (`UI.setText`, `UI.screen`, `UI.toast`, `UI.icon`...).
+
+Apps **carry a copy inline**, between `jnssn-ui` fences, rather than linking it
+— the same reasoning as the language runtime: the single-file rule holds, and
+opening `apps/<slug>/index.html` from a bare clone still works.
+
+```sh
+node scripts/build.mjs --sync-ui   # rewrite the fenced blocks in every app
+                                   # and in the scaffold boilerplate
+```
+
+Nothing else may write inside the fences. A normal build fails on drift, which
+is the only thing standing between one design system and five. App-specific CSS
+goes below the fence, built from the tokens.
+
+`--accent` is derived from the slug's hue, the same one that colours the icon
+and `theme-color`, so nobody picks a colour per app. Red and green stay reserved
+for `--pos` / `--neg`; an app whose hue lands in the red band (rikiki is 352)
+would otherwise have its accent read as a failure state.
+
+**The render rule:** markup is written once in HTML and the nodes that change
+are patched. Never `innerHTML` a whole screen on a tap — it throws away focus,
+scroll position and screen-reader context, and makes animation impossible.
+
+The contributor-facing version of all this is in `CONTRIBUTING.md`. Change one
+and change the other.
+
 ## App conventions
 
 How to write the file itself — the single-file rule, guarded `localStorage`,
@@ -63,6 +93,8 @@ The build validates every app and fails rather than shipping a broken page:
    **`jnssn-lang`** runtime, or the site-wide toggle cannot reach it.
 8. `index.html` under **250 kB**, with a warning past 120 kB.
 9. `meta.json`'s `icon` must name a mark defined in `scripts/icon.mjs`.
+10. The **UI kit block** must match `scripts/ui.mjs`. Drift is a hard error;
+    absence is a warning until every app is migrated.
 
 `CONTRIBUTING.md` is the contributor-facing version of this list. Change one and
 change the other.
