@@ -230,19 +230,46 @@ every visitor pays it.
 
 ## Deploy
 
-Cloudflare Pages project `mini-games`, connected to this repo.
+**Two** Cloudflare Pages projects, both connected to this repo, differing only
+in which branch they treat as production.
 
-| Setting | Value |
-| --- | --- |
-| Production branch | `main` |
-| Build command | `node scripts/build.mjs` |
-| Build output directory | `dist` |
-| Root directory | *(blank)* |
-| Custom domain | `games.jnssn.io` |
+| | Live | Dev |
+| --- | --- | --- |
+| Pages project | `mini-games` | `mini-games-dev` |
+| Production branch | `main` | `dev` |
+| Custom domain | `games.jnssn.io` | `games-dev.jnssn.io` |
+| Build command | `node scripts/build.mjs` | `node scripts/build.mjs` |
+| Build output directory | `dist` | `dist` |
+| Root directory | *(blank)* | *(blank)* |
+| Preview deployments | None | None |
 
-Push to `main` → Pages builds and deploys. **Roughly 30–60 seconds** from push
-to live, plus a few seconds of CDN propagation. Pushes to any other branch get a
-preview URL and do not touch production.
+Push to `dev` → `games-dev.jnssn.io` updates. Merge `dev` into `main` →
+`games.jnssn.io` updates. **Roughly 30–60 seconds** from push to live, plus a
+few seconds of CDN propagation.
+
+Set **Preview deployments: None** on both projects. Otherwise every push to
+every branch builds twice, once per project, for a URL nobody reads.
+
+### Why two projects rather than one branch alias
+
+The obvious approach — point `games-dev` at a branch alias like
+`dev.mini-games.pages.dev` — **does not work**, and it is worth writing down so
+nobody spends an evening on it.
+
+Pages routes a preview deployment by the hostname in the request. A request
+arriving at the alias with `Host: games-dev.jnssn.io` is a host that project
+does not recognise, so it does not serve the branch build. Custom domains on
+Pages attach to production, not to a preview branch; there is no dashboard
+setting for it. The workarounds are a Worker that rewrites the `Host` header, or
+Access-style routing — both are code that can break, in front of the whole site.
+
+A second Pages project makes `dev` a *production* branch of its own. The custom
+domain is then completely ordinary: Universal SSL, one DNS record, no Worker, no
+header rewriting, and a bug in one project cannot take the other down. Both
+projects fit the free tier.
+
+The cost is that the two projects' settings must be kept identical apart from
+the branch. They are both in the table above; change one and change the other.
 
 ## Turning an app on or off
 
@@ -286,6 +313,15 @@ a single-file app is shared.
 
 ## Commits
 
+Work lands on `dev` first, is checked at `games-dev.jnssn.io`, and reaches
+players by merging `dev` into `main`. `dev` is never reset or force-pushed —
+`main` is only ever behind it, never divergent.
+
+```sh
+git switch dev && git push -u origin dev     # -> games-dev.jnssn.io
+git switch main && git merge dev && git push # -> games.jnssn.io
+```
+
 Conventional Commits, imperative, lowercase subject:
 
 ```
@@ -317,18 +353,19 @@ delivery, because Cloudflare's proxy only handles HTTP.
 | `jnssn.io` | TXT | `apple-domain=qg8zUWJCYHuroy7V` | n/a |
 | `sig1._domainkey.jnssn.io` | CNAME | `sig1.dkim.jnssn.io.at.icloudmailadmin.com` | **DNS only** |
 
-The only record this project needs:
+The only records this project needs:
 
 | Name | Type | Value | Proxy |
 | --- | --- | --- | --- |
 | `games` | CNAME | `mini-games.pages.dev` | Proxied |
+| `games-dev` | CNAME | `mini-games-dev.pages.dev` | Proxied |
 
-`games` is its own label and cannot collide with the mail records: the MX and
+Both are their own labels and cannot collide with the mail records: the MX and
 SPF records sit at the zone apex (`jnssn.io`), and DKIM sits at
-`sig1._domainkey`. A CNAME at `games` does not shadow the apex and does not
-affect mail routing. Adding `games.jnssn.io` as a Pages custom domain normally
-creates this record automatically, since the zone is in the same Cloudflare
-account.
+`sig1._domainkey`. A CNAME at `games` or `games-dev` does not shadow the apex
+and does not affect mail routing. Adding the hostname as a Pages custom domain
+normally creates the record automatically, since the zone is in the same
+Cloudflare account.
 
 The site previously lived at `apps.jnssn.io`. That custom domain and its DNS
 record were retired; the same reasoning applies to any future label.

@@ -13,6 +13,22 @@ the **`new-app`** skill for a new game, and use the **`self-contained-html`**
 skill (from the `self-contained-web` plugin) for how to write the file itself.
 This file is the checklist that sits between them.
 
+## Two environments
+
+| Branch | URL | What it is |
+| --- | --- | --- |
+| `dev` | `games-dev.jnssn.io` | Where a change is checked before anyone plays it |
+| `main` | `games.jnssn.io` | Live |
+
+Push to `dev`, open it on your phone, and merge `dev` into `main` when it is
+right. Each is a Cloudflare Pages project of its own — see `CLAUDE.md` for why a
+branch alias does not work for this.
+
+```sh
+git switch dev && git push -u origin dev     # -> games-dev.jnssn.io
+git switch main && git merge dev && git push # -> games.jnssn.io
+```
+
 ## How work reaches the site
 
 **There are no pull requests and no issues.** Commit to `main` and push. Pages
