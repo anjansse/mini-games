@@ -17,6 +17,7 @@ point of keeping each app to one file.
 | --- | --- |
 | Live | https://games.jnssn.io |
 | Conventions, DNS, troubleshooting | [`CLAUDE.md`](CLAUDE.md) |
+| Adding a game | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | Routing and on/off flags | [`config/apps.json`](config/apps.json) |
 | Build | `node scripts/build.mjs` |
 

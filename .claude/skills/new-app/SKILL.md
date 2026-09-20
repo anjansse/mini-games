@@ -65,6 +65,9 @@ Append to `apps` in `config/apps.json`:
 
 **Disabled by default, always.** It goes live only when Antoine asks.
 
+Anything counted must use `Intl.PluralRules`, never a hand-rolled `n > 1`. See
+`CONTRIBUTING.md`.
+
 ## 4. Validate
 
 ```sh

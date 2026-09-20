@@ -174,55 +174,64 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
   var armed = false;
 
   /* ---------- strings ----------
-     French plurals mark from 2 up ("0 carte", "1 carte", "2 cartes");
-     English from anything but 1 ("0 cards", "1 card", "2 cards"). Each
-     language therefore brings its own plural helper rather than sharing one. */
-  function fp(n, one, many){ return n+' '+(n>1?many:one); }
-  function ep(n, one, many){ return n+' '+(n===1?one:many); }
+     Plural categories come from Intl.PluralRules, which implements the Unicode
+     CLDR plural rules and is built into every browser. Do NOT hand-roll them:
+     French counts 0 and 1 as singular ("0 carte", "1 carte", "2 cartes") while
+     English counts only 1 ("0 cards", "1 card"), and other languages have up to
+     six categories. A plural entry is an object keyed by CLDR category. */
+  var PR = {};
+  function rules(l){
+    if(!(l in PR)){ try{ PR[l] = new Intl.PluralRules(l); }catch(e){ PR[l] = null; } }
+    return PR[l];
+  }
+  function plural(l, n, forms){
+    var r = rules(l), cat = r ? r.select(n) : (n === 1 ? 'one' : 'other');
+    return n + ' ' + (forms[cat] || forms.other);
+  }
 
   var L = {
     fr: {
       locale:'fr-BE', docTitle:'Rikiki, feuille de score', home:'← tous les jeux',
       brandSub:'feuille de score', who:'Qui joue ?',
-      playerN:function(n){ return 'Joueur '+n; },
-      playerLabel:function(n){ return 'Nom du joueur '+n; },
+      playerN:function(n){ return 'Joueur ' + n; },
+      playerLabel:function(n){ return 'Nom du joueur ' + n; },
       removePlayer:'Retirer ce joueur',
       dealOrder:'Le premier de la liste donne la première manche, puis ça tourne.',
       addPlayer:'Ajouter un joueur', rules:'Règles de la partie',
-      maxCards:'Cartes au maximum',
-      roundsTotal:function(n){ return fp(n,'manche','manches')+' au total'; },
+      maxCards:'Nombre de cartes maximum',
+      roundsTotal:function(n){ return plural('fr', n, {one:'manche', other:'manches'}) + ' au total'; },
       upDown:'Monter puis redescendre',
-      forbid:'Pari interdit pour le donneur',
-      forbidNote:'Le total des paris ne peut pas égaler le nombre de cartes',
-      ptsHit:'Points si pari réussi', ptsPer:'Points par pli gagné',
+      forbid:'Annonce interdite au donneur',
+      forbidNote:'Le total des annonces ne peut pas égaler le nombre de cartes',
+      ptsHit:'Points si l’annonce est réussie', ptsPer:'Points par pli gagné',
       ptsPen:'Points perdus par pli d’écart',
       start:'Commencer la partie', recent:'Dernières parties',
       clear:'Effacer', confirm:'Confirmer',
-      localOnly:'Tout est enregistré sur cet appareil uniquement. Effacer les données du navigateur efface la partie et l’historique.',
-      noHistory:'Aucune partie enregistrée pour l’instant. Les 5 dernières s’affichent ici.',
-      stopped:' (arrêtée)',
-      roundOf:function(i,n){ return 'Manche '+i+' sur '+n; },
-      cards:function(n){ return fp(n,'carte','cartes'); },
-      tricks:function(n){ return fp(n,'pli','plis'); },
-      rounds:function(n){ return fp(n,'manche','manches'); },
-      deals:function(nm){ return '<b>'+nm+'</b> donne'; },
-      leads:function(nm){ return '<b>'+nm+'</b> commence'; },
+      localOnly:'Tout est enregistré sur cet appareil uniquement. Effacer les données de navigation supprime la partie en cours et l’historique.',
+      noHistory:'Aucune partie enregistrée. Les cinq dernières apparaîtront ici.',
+      stopped:' (interrompue)',
+      roundOf:function(i,n){ return 'Manche ' + i + ' sur ' + n; },
+      cards:{one:'carte', other:'cartes'},
+      tricks:{one:'pli', other:'plis'},
+      rounds:{one:'manche', other:'manches'},
+      deals:function(nm){ return '<b>' + nm + '</b> donne'; },
+      leads:function(nm){ return '<b>' + nm + '</b> entame'; },
       phase1:'1. Annoncé', phase2:'2. Réalisé',
       bidsLead:'Plis annoncés', tricksLead:'Plis réalisés',
-      banned:function(n){ return 'interdit : '+n; },
+      banned:function(n){ return 'interdit : ' + n; },
       dealerFree:'donneur, tout est permis', dealerLast:'donneur, annonce en dernier',
-      totalBids:function(t,c){ return 'Total des paris : '+t+' pour '+c+'.'; },
-      totalBad:function(n,d){ return 'Le total ne peut pas faire '+n+'. '+d+' doit changer son pari.'; },
+      totalBids:function(t,c){ return 'Total des annonces : ' + t + ' pour ' + c + '.'; },
+      totalBad:function(n,d){ return 'Le total ne peut pas faire ' + n + '. ' + d + ' doit changer son annonce.'; },
       confirmBids:'Valider les annonces',
-      bidChip:function(n){ return 'annoncé '+n; },
-      pts:function(s){ return s+' pts'; },
+      bidChip:function(n){ return 'annoncé ' + n; },
+      pts:function(s){ return s + ' pts'; },
       countsOk:'Le compte est bon.',
-      needMore:function(d,c){ return 'Partez des annonces et corrigez. Encore '+d+' à attribuer sur '+c+'.'; },
-      tooMany:function(s){ return s+' en trop.'; },
+      needMore:function(d,c){ return 'Ajustez à partir des annonces. Il reste ' + d + ' à répartir sur ' + c + '.'; },
+      tooMany:function(s){ return s + ' de trop.'; },
       confirmRound:'Valider la manche', theSheet:'La feuille',
       latestTop:'Dernière manche en haut', firstTop:'Première manche en haut',
       orderLabel:'Changer l’ordre des manches',
-      sheetEmpty:'Les manches jouées s’inscrivent ici. Sous chaque score : pari / plis faits.',
+      sheetEmpty:'Les manches jouées s’inscrivent ici. Sous chaque score : annonce / plis réalisés.',
       colRound:'Manche', goBack:'Revenir en arrière',
       stopGame:'Arrêter la partie', confirmStop:'Confirmer : arrêter',
       done:'Fini !', standings:'Classement',
@@ -233,13 +242,13 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
     en: {
       locale:'en-GB', docTitle:'Rikiki score sheet', home:'← all games',
       brandSub:'score sheet', who:'Who plays?',
-      playerN:function(n){ return 'Player '+n; },
-      playerLabel:function(n){ return 'Player '+n+' name'; },
+      playerN:function(n){ return 'Player ' + n; },
+      playerLabel:function(n){ return 'Player ' + n + ' name'; },
       removePlayer:'Remove this player',
       dealOrder:'The first name on the list deals the first round, then it rotates.',
       addPlayer:'Add a player', rules:'Game rules',
-      maxCards:'Maximum cards',
-      roundsTotal:function(n){ return ep(n,'round','rounds')+' in total'; },
+      maxCards:'Maximum number of cards',
+      roundsTotal:function(n){ return plural('en', n, {one:'round', other:'rounds'}) + ' in total'; },
       upDown:'Up then back down',
       forbid:'Dealer bid restriction',
       forbidNote:'The bids cannot add up to the number of cards',
@@ -247,27 +256,27 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
       ptsPen:'Points lost per trick off',
       start:'Start the game', recent:'Recent games',
       clear:'Clear', confirm:'Confirm',
-      localOnly:'Everything is saved on this device only. Clearing browser data erases the game and the history.',
-      noHistory:'No games saved yet. The last 5 show up here.',
+      localOnly:'Everything is saved on this device only. Clearing browsing data erases the current game and the history.',
+      noHistory:'No games saved yet. The last five will show up here.',
       stopped:' (stopped)',
-      roundOf:function(i,n){ return 'Round '+i+' of '+n; },
-      cards:function(n){ return ep(n,'card','cards'); },
-      tricks:function(n){ return ep(n,'trick','tricks'); },
-      rounds:function(n){ return ep(n,'round','rounds'); },
-      deals:function(nm){ return '<b>'+nm+'</b> deals'; },
-      leads:function(nm){ return '<b>'+nm+'</b> leads'; },
+      roundOf:function(i,n){ return 'Round ' + i + ' of ' + n; },
+      cards:{one:'card', other:'cards'},
+      tricks:{one:'trick', other:'tricks'},
+      rounds:{one:'round', other:'rounds'},
+      deals:function(nm){ return '<b>' + nm + '</b> deals'; },
+      leads:function(nm){ return '<b>' + nm + '</b> leads'; },
       phase1:'1. Bid', phase2:'2. Won',
       bidsLead:'Tricks bid', tricksLead:'Tricks won',
-      banned:function(n){ return 'not allowed: '+n; },
+      banned:function(n){ return 'not allowed: ' + n; },
       dealerFree:'dealer, anything goes', dealerLast:'dealer, bids last',
-      totalBids:function(t,c){ return 'Bids total '+t+' for '+c+'.'; },
-      totalBad:function(n,d){ return 'The bids cannot total '+n+'. '+d+' must change their bid.'; },
+      totalBids:function(t,c){ return 'Bids total ' + t + ' for ' + c + '.'; },
+      totalBad:function(n,d){ return 'The bids cannot total ' + n + '. ' + d + ' must change their bid.'; },
       confirmBids:'Confirm the bids',
-      bidChip:function(n){ return 'bid '+n; },
-      pts:function(s){ return s+' pts'; },
+      bidChip:function(n){ return 'bid ' + n; },
+      pts:function(s){ return s + ' pts'; },
       countsOk:'That adds up.',
-      needMore:function(d,c){ return 'Work from the bids and adjust. '+d+' still to assign out of '+c+'.'; },
-      tooMany:function(s){ return s+' too many.'; },
+      needMore:function(d,c){ return 'Work from the bids and adjust. ' + d + ' still to assign out of ' + c + '.'; },
+      tooMany:function(s){ return s + ' too many.'; },
       confirmRound:'Confirm the round', theSheet:'The sheet',
       latestTop:'Latest round on top', firstTop:'First round on top',
       orderLabel:'Change the round order',
@@ -280,10 +289,14 @@ td .bm{display:block;font-size:12px;color:var(--ink-soft)}
       less:'Minus', more:'Plus'
     }
   };
-  function D(){ return L[window.JLang ? window.JLang.get() : 'en'] || L.en; }
-  // t('key') for a plain string, t('key', a, b) for one that takes arguments.
+  function lang(){ return window.JLang ? window.JLang.get() : 'en'; }
+  function D(){ return L[lang()] || L.en; }
+  /* t('key')            -> a plain string
+     t('key', a, b)      -> a string that takes arguments
+     t('pluralKey', n)   -> "n form", with the form chosen by CLDR rules */
   function t(k){
     var v = D()[k];
+    if(v && typeof v === 'object' && v.other !== undefined) return plural(lang(), arguments[1], v);
     if(typeof v !== 'function') return v;
     return v.apply(null, Array.prototype.slice.call(arguments, 1));
   }
