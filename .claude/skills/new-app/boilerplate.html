@@ -112,10 +112,19 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 .row .title{display:block;font-weight:600}
 .row .title.one{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sub{display:block;font-size:13px;color:var(--dim);margin-top:1px}
-.row.lead{background:var(--accent-wash)}
+/* Neutral, not accent-washed. An app whose hue is in the red band — rikiki is
+   352 — otherwise gets a red row, and a red row reads as "you did something
+   wrong" rather than "this is the one to look at". Say WHY a row is marked in
+   words; do not make the colour carry it. */
+.row.lead{background:var(--inset)}
 
 /* --- controls ---------------------------------------------------------- */
 button,input,select{font:inherit;color:inherit}
+/* touch-action:manipulation removes the double-tap-to-zoom gesture, so tapping
+   + four times in a second counts four times instead of zooming the page.
+   user-select stops the same rapid tapping from selecting the label. */
+button,a,.tile,summary{touch-action:manipulation}
+button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-select:none}
 .btn{
   display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
   min-height:54px;padding:0 20px;border:1px solid transparent;border-radius:var(--r);
@@ -228,8 +237,6 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 .rise:nth-child(3){animation-delay:80ms}
 .rise:nth-child(4){animation-delay:120ms}
 .rise:nth-child(5){animation-delay:160ms}
-@keyframes bump{50%{transform:scale(1.22)}}
-.bump{animation:bump var(--mid) var(--spring)}
 
 /* --- app shell ----------------------------------------------------------
    Every app has a bar and a stack of screens, whatever it is a game of. An
@@ -496,7 +503,6 @@ dialog.sheet h2{margin-bottom:12px}
     v = String(v);
     if(el.textContent === v) return;
     el.textContent = v;
-    if(!reduce.matches){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
   }
   function setAttr(el, k, v){
     if(!el) return;
@@ -557,12 +563,63 @@ dialog.sheet h2{margin-bottom:12px}
     if(!el || el.open) return;
     el.showModal();
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
+    dragSheet(el);
+  }
+
+  /* Drag the sheet down to dismiss it.
+
+     Dragging a sheet downwards is what a phone user tries first, and without
+     this the gesture falls through to the page behind and pulls it to refresh
+     — losing the game instead of closing the sheet. touchmove is therefore
+     non-passive and preventDefault()s while the drag is live, which is what
+     actually stops the refresh; overscroll-behavior alone does not.
+
+     The drag only starts when the sheet's own content is already scrolled to
+     the top, so a long settings list still scrolls normally. */
+  function dragSheet(el){
+    var body = el.querySelector('.body');
+    if(!body || body.dataset.drag === '1') return;
+    body.dataset.drag = '1';
+    var y0 = 0, dy = 0, live = false;
+
+    body.addEventListener('touchstart', function(e){
+      if(e.touches.length !== 1 || body.scrollTop > 0) return;
+      y0 = e.touches[0].clientY; dy = 0; live = true;
+      body.style.transition = 'none';
+    }, {passive:true});
+
+    body.addEventListener('touchmove', function(e){
+      if(!live) return;
+      dy = e.touches[0].clientY - y0;
+      if(dy <= 0){
+        // Dragging up again: hand the gesture back to normal scrolling.
+        if(body.scrollTop > 0){ live = false; body.style.transition = ''; body.style.transform = ''; }
+        return;
+      }
+      e.preventDefault();
+      // Past the threshold it tracks the finger 1:1; before it, a little
+      // resistance so a stray few pixels do not look like the sheet is loose.
+      body.style.transform = 'translateY(' + (dy < 24 ? dy * 0.5 : dy - 12) + 'px)';
+    }, {passive:false});
+
+    function end(){
+      if(!live) return;
+      live = false;
+      body.style.transition = 'transform var(--mid) var(--ease)';
+      body.style.transform = '';
+      // A short flick counts as well as a long drag.
+      if(dy > 96) closeSheet(el);
+    }
+    body.addEventListener('touchend', end);
+    body.addEventListener('touchcancel', end);
   }
   function closeSheet(el){
     el = typeof el === 'string' ? document.getElementById(el) : el;
     if(!el || !el.open) return;
     var body = el.querySelector('.body');
-    if(reduce.matches || !body){ el.close(); return; }
+    if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
+    // Clear anything the drag left inline, or it fights the exit animation.
+    body.style.transition = ''; body.style.transform = '';
     body.style.animation = 'sheet-up var(--mid) var(--ease) reverse both';
     setTimeout(function(){ body.style.animation = ''; el.close(); }, 200);
   }
