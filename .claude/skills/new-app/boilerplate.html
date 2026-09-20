@@ -562,6 +562,16 @@ dialog.sheet h2{margin-bottom:12px}
     el = typeof el === 'string' ? document.getElementById(el) : el;
     if(!el || el.open) return;
     el.showModal();
+    var body = el.querySelector('.body');
+    if(body){
+      // A sheet reopens at the top, never where it was left. Without this a
+      // sheet that was scrolled once comes back scrolled, and its heading and
+      // first options sit above the fold looking as though they are missing.
+      // This has to run AFTER showModal: a closed <dialog> is display:none,
+      // and assigning scrollTop to a display:none element does nothing.
+      body.style.transition = ''; body.style.transform = ''; body.style.animation = '';
+      body.scrollTop = 0;
+    }
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
     dragSheet(el);
   }
@@ -605,10 +615,12 @@ dialog.sheet h2{margin-bottom:12px}
     function end(){
       if(!live) return;
       live = false;
+      // Past the threshold, hand straight over to closeSheet, which carries on
+      // downwards from the current offset. Snapping back to 0 first is what
+      // produced the down-up-down stutter.
+      if(dy > 96){ closeSheet(el); return; }
       body.style.transition = 'transform var(--mid) var(--ease)';
       body.style.transform = '';
-      // A short flick counts as well as a long drag.
-      if(dy > 96) closeSheet(el);
     }
     body.addEventListener('touchend', end);
     body.addEventListener('touchcancel', end);
@@ -618,10 +630,17 @@ dialog.sheet h2{margin-bottom:12px}
     if(!el || !el.open) return;
     var body = el.querySelector('.body');
     if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
-    // Clear anything the drag left inline, or it fights the exit animation.
-    body.style.transition = ''; body.style.transform = '';
-    body.style.animation = 'sheet-up var(--mid) var(--ease) reverse both';
-    setTimeout(function(){ body.style.animation = ''; el.close(); }, 200);
+    // A transition, not the keyframe reversed: a keyframe always starts from
+    // translateY(0), so closing a sheet the finger had already dragged to
+    // 150px snapped it back up first and then played it down — the double
+    // movement. A transition runs from wherever it actually is.
+    body.style.animation = '';
+    body.style.transition = 'transform var(--mid) var(--ease)';
+    body.style.transform = 'translateY(100%)';
+    setTimeout(function(){
+      body.style.transition = ''; body.style.transform = '';
+      el.close();
+    }, 210);
   }
 
   /* Announce something to a screen reader without showing it. A score that

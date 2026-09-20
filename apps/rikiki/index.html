@@ -552,6 +552,7 @@ details.past[open] summary{background:var(--inset)}
 <dialog class="sheet" id="rules">
   <div class="body">
     <h2 id="rulesh"></h2>
+    <p class="dim" id="ruleshint" style="margin:-6px 2px 12px;font-size:13px"></p>
     <div class="card list">
       <div class="row">
         <div class="grow">
@@ -699,6 +700,16 @@ details.past[open] summary{background:var(--inset)}
     el = typeof el === 'string' ? document.getElementById(el) : el;
     if(!el || el.open) return;
     el.showModal();
+    var body = el.querySelector('.body');
+    if(body){
+      // A sheet reopens at the top, never where it was left. Without this a
+      // sheet that was scrolled once comes back scrolled, and its heading and
+      // first options sit above the fold looking as though they are missing.
+      // This has to run AFTER showModal: a closed <dialog> is display:none,
+      // and assigning scrollTop to a display:none element does nothing.
+      body.style.transition = ''; body.style.transform = ''; body.style.animation = '';
+      body.scrollTop = 0;
+    }
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
     dragSheet(el);
   }
@@ -742,10 +753,12 @@ details.past[open] summary{background:var(--inset)}
     function end(){
       if(!live) return;
       live = false;
+      // Past the threshold, hand straight over to closeSheet, which carries on
+      // downwards from the current offset. Snapping back to 0 first is what
+      // produced the down-up-down stutter.
+      if(dy > 96){ closeSheet(el); return; }
       body.style.transition = 'transform var(--mid) var(--ease)';
       body.style.transform = '';
-      // A short flick counts as well as a long drag.
-      if(dy > 96) closeSheet(el);
     }
     body.addEventListener('touchend', end);
     body.addEventListener('touchcancel', end);
@@ -755,10 +768,17 @@ details.past[open] summary{background:var(--inset)}
     if(!el || !el.open) return;
     var body = el.querySelector('.body');
     if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
-    // Clear anything the drag left inline, or it fights the exit animation.
-    body.style.transition = ''; body.style.transform = '';
-    body.style.animation = 'sheet-up var(--mid) var(--ease) reverse both';
-    setTimeout(function(){ body.style.animation = ''; el.close(); }, 200);
+    // A transition, not the keyframe reversed: a keyframe always starts from
+    // translateY(0), so closing a sheet the finger had already dragged to
+    // 150px snapped it back up first and then played it down — the double
+    // movement. A transition runs from wherever it actually is.
+    body.style.animation = '';
+    body.style.transition = 'transform var(--mid) var(--ease)';
+    body.style.transform = 'translateY(100%)';
+    setTimeout(function(){
+      body.style.transition = ''; body.style.transform = '';
+      el.close();
+    }, 210);
   }
 
   /* Announce something to a screen reader without showing it. A score that
@@ -916,7 +936,10 @@ details.past[open] summary{background:var(--inset)}
       again:'Rejouer avec les mêmes joueurs', fixLast:'Corriger la dernière manche',
       changePlayers:'Changer les joueurs ou les règles',
       less:'Moins', more:'Plus',
-      undo:'Annuler', roundUndone:'Manche annulée.'
+      undo:'Annuler', roundUndone:'Manche annulée.',
+      rulesLive:'Le barème s\u2019applique aux manches à venir ; les manches déjà jouées gardent le leur.',
+      cfgLocked:'Impossible : des manches déjà jouées seraient supprimées.',
+      resume:'Reprendre cette partie', resumed:'Partie reprise.'
     },
     en: {
       locale:'en-GB', docTitle:'Rikiki score sheet', home:'All games',
@@ -968,7 +991,10 @@ details.past[open] summary{background:var(--inset)}
       again:'Play again, same players', fixLast:'Fix the last round',
       changePlayers:'Change the players or the rules',
       less:'Minus', more:'Plus',
-      undo:'Undo', roundUndone:'Round undone.'
+      undo:'Undo', roundUndone:'Round undone.',
+      rulesLive:'Scoring applies to rounds still to come; rounds already played keep theirs.',
+      cfgLocked:'Not possible: rounds already played would be dropped.',
+      resume:'Resume this game', resumed:'Game resumed.'
     }
   };
   function lang(){ return window.JLang ? window.JLang.get() : 'en'; }
@@ -1019,8 +1045,10 @@ details.past[open] summary{background:var(--inset)}
   function archive(finished){
     if(!S.id || !S.rounds.length) return;
     var H = loadHistory().filter(function(g){ return g.id !== S.id; });
+    // The whole cfg, not just the scoring: a stopped game is resumed from
+    // this entry and needs its round structure back as well.
     H.unshift({id:S.id, ts:Date.now(), finished:!!finished, players:S.players.slice(),
-               cfg:{bonus:S.cfg.bonus, per:S.cfg.per, pen:S.cfg.pen}, rounds:JSON.parse(JSON.stringify(S.rounds))});
+               cfg:JSON.parse(JSON.stringify(S.cfg)), rounds:JSON.parse(JSON.stringify(S.rounds))});
     MEMH = H.slice(0, HMAX);
     try{ localStorage.setItem(HKEY, JSON.stringify(MEMH)); }catch(e){}
   }
@@ -1050,7 +1078,10 @@ details.past[open] summary{background:var(--inset)}
   function totals(g){
     g = g || S;
     var tt = g.players.map(function(){ return 0; });
-    g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ tt[i] += points(b, r.made[i], g.cfg); }); });
+    // r.cfg is the scoring in force when that round was recorded. Without it,
+    // changing the points mid-game silently rescores every round already
+    // played. Older saves have no r.cfg and fall back to the game's.
+    g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ tt[i] += points(b, r.made[i], r.cfg || g.cfg); }); });
     return tt;
   }
   function roundInfo(){
@@ -1204,7 +1235,7 @@ details.past[open] summary{background:var(--inset)}
       var r = o.r;
       h += '<tr><th scope="row">'+(o.k+1)+'<span class="bm">'+esc(t('cards',r.cards))+'</span></th>';
       r.bids.forEach(function(b,i){
-        var d = points(b, r.made[i], g.cfg);
+        var d = points(b, r.made[i], r.cfg || g.cfg);
         h += '<td><span class="d num '+(d<0?'neg':'pos')+'">'+sign(d)+'</span><span class="bm num">'+b+' / '+r.made[i]+'</span></td>';
       });
       h += '</tr>';
@@ -1261,7 +1292,9 @@ details.past[open] summary{background:var(--inset)}
         var tt = totals(g), order = g.players.map(function(_,i){return i;}).sort(function(a,b){ return tt[b]-tt[a]; });
         var line = order.map(function(i){ return esc(g.players[i])+' '+tt[i]; }).join(', ');
         return '<details class="past"><summary><span class="pd">'+esc(when(g.ts))+(g.finished?'':esc(t('stopped')))+'</span>'+
-               '<span class="pl">'+line+'</span></summary><div>'+tableHtml(g, false)+'</div></details>';
+               '<span class="pl">'+line+'</span></summary><div>'+
+               (g.finished ? '' : '<div style="padding:12px 14px 0"><button class="btn ghost" data-resume="'+esc(g.id)+'">'+esc(t('resume'))+'</button></div>')+
+               tableHtml(g, false)+'</div></details>';
       }).join('') + '</div>';
     }
     var target = inGame ? 'hist-done' : 'hist-setup';
@@ -1325,12 +1358,11 @@ details.past[open] summary{background:var(--inset)}
     document.querySelectorAll('[data-tog]').forEach(function(b){
       b.setAttribute('aria-pressed', !!S.cfg[b.dataset.tog]);
     });
-    // The rules are fixed once a game is under way; changing them mid-game
-    // would silently rescore rounds already played.
-    var live = S.phase!=='setup';
-    document.querySelectorAll('#rules .stepper button, #rules [data-tog]').forEach(function(b){
-      UI.setAttr(b, 'disabled', live || null);
-    });
+    // Everything stays adjustable during a game. Scoring changes are safe
+    // because each round carries the scoring it was played under, so they
+    // only affect rounds still to come. Changes to the round STRUCTURE are
+    // guarded at the point of change instead, in applyCfg.
+    UI.setText($('ruleshint'), S.phase==='setup' ? '' : t('rulesLive'));
   }
 
   // The whole screen, for a change of screen or language. Individual taps use
@@ -1347,6 +1379,24 @@ details.past[open] summary{background:var(--inset)}
   function show(){
     UI.screen(S.phase==='setup' ? 'setup' : S.phase==='done' ? 'done' : 'game');
     $('openrules').hidden = false;
+  }
+
+  /* Apply a rules change, refusing one that would shorten the round sequence
+     past what has already been played — reducing the maximum card count or
+     turning off the descent can otherwise leave the game with more rounds on
+     the sheet than the sequence still has room for. */
+  function applyCfg(fn){
+    var before = JSON.stringify(S.cfg);
+    fn();
+    if(S.phase !== 'setup' && seq().length <= S.rounds.length){
+      S.cfg = JSON.parse(before);
+      UI.toast(t('cfgLocked'));
+      return;
+    }
+    paintRules(); save();
+    // The card count, the dots and the live points all read the config.
+    if(S.phase === 'bids' || S.phase === 'tricks'){ paintRound(); paintSheet(); }
+    else if(S.phase === 'done'){ paintDone(); }
   }
 
   /* ---------- confirm ---------- */
@@ -1409,16 +1459,34 @@ details.past[open] summary{background:var(--inset)}
         UI.live(S.players[i] + ': ' + (S.phase==='bids' ? S.cur.bids[i] : S.cur.made[i]));
       }else{
         var k = st.dataset.cfg;
-        if(k==='max') S.cfg.max = Math.max(1, Math.min(hardMax(S.players.length), maxCards()+d));
-        else S.cfg[k] = Math.max(0, Math.min(k==='bonus'?50:20, S.cfg[k]+d));
-        paintRules(); save();
+        applyCfg(function(){
+          if(k==='max') S.cfg.max = Math.max(1, Math.min(hardMax(S.players.length), maxCards()+d));
+          else S.cfg[k] = Math.max(0, Math.min(k==='bonus'?50:20, S.cfg[k]+d));
+        });
       }
       return;
     }
 
-    if(b.dataset.tog){ S.cfg[b.dataset.tog] = !S.cfg[b.dataset.tog]; paintRules(); save(); return; }
+    if(b.dataset.tog){ applyCfg(function(){ S.cfg[b.dataset.tog] = !S.cfg[b.dataset.tog]; }); return; }
     if(b.dataset.rm){ if(S.players.length>2){ S.players.splice(+b.dataset.rm,1); paintPlayers(); paintRules(); save(); } return; }
     if(b.dataset.phase === 'bids' && S.phase === 'tricks'){ S.phase='bids'; mountRound(); save(); return; }
+    if(b.dataset.resume){
+      var g = loadHistory().filter(function(x){ return x.id === b.dataset.resume; })[0];
+      if(g){
+        // Whatever is on the table now is kept before loading the other game,
+        // so resuming one stopped game never loses another.
+        archive(false);
+        S.players = g.players.slice();
+        S.cfg = Object.assign(fresh().cfg, g.cfg || {});
+        S.rounds = JSON.parse(JSON.stringify(g.rounds));
+        S.cur = newCur();
+        S.id = g.id;                      // same entry, so it updates in place
+        S.phase = S.rounds.length >= seq().length ? 'done' : 'bids';
+        paintAll(); show();
+        UI.toast(t('resumed'));
+      }
+      return;
+    }
     if(b.dataset.clearh){
       ask(t('clearTitle'), t('clearBody'), t('clear'), function(){
         MEMH = []; try{ localStorage.removeItem(HKEY); }catch(e){}
@@ -1446,7 +1514,8 @@ details.past[open] summary{background:var(--inset)}
         }else{
           var R2 = roundInfo();
           if(sum(S.cur.made)!==R2.cards) break;
-          S.rounds.push({cards:R2.cards, dealer:R2.dealer, bids:S.cur.bids.slice(), made:S.cur.made.slice()});
+          S.rounds.push({cards:R2.cards, dealer:R2.dealer, bids:S.cur.bids.slice(), made:S.cur.made.slice(),
+                         cfg:{bonus:S.cfg.bonus, per:S.cfg.per, pen:S.cfg.pen}});
           if(S.rounds.length>=R2.count){ S.phase='done'; S.cur=null; archive(true); paintAll(); show(); }
           else{
             S.cur = newCur(); S.phase='bids'; archive(false);
