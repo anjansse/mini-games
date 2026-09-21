@@ -124,7 +124,13 @@ landing page. That is correct.
 ```sh
 git add apps/<slug> config/apps.json site/index.html
 git commit -m "feat(apps): add <slug>"
-git push -u origin main
+git switch dev && git push -u origin dev
+```
+
+Check it at `https://games-dev.jnssn.io/<slug>/`, then merge to live:
+
+```sh
+git switch main && git merge dev && git push
 ```
 
 `dist/` is git-ignored; Cloudflare Pages regenerates it.
@@ -138,7 +144,7 @@ Keep it to four lines:
 
 ```
 <Title> is live at https://games.jnssn.io/<slug>/ — currently off, so it shows
-the "switched off" page.
+the "switched off" page. Checked first on https://games-dev.jnssn.io/<slug>/.
 
 To turn it on, send me: enable <slug>
 ```

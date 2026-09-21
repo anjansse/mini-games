@@ -93,7 +93,8 @@ The build validates every app and fails rather than shipping a broken page:
 2. **No Claude-runtime APIs**: `window.claude`, `claude.use(...)`,
    `window.storage`, `api.anthropic.com`.
 3. **No external hosts** except `cdnjs.cloudflare.com` and
-   `fonts.googleapis.com` / `fonts.gstatic.com`.
+   `fonts.googleapis.com` / `fonts.gstatic.com`. An `xmlns` attribute is
+   stripped before the scan: a namespace URI is an identifier, not a fetch.
 4. A **`viewport`** meta tag.
 5. **`prefers-color-scheme`** support.
 6. Literal **`</head>` and `</body>`** tags — the build injects the PWA plumbing
@@ -365,8 +366,9 @@ docs: <what>
 build: <change to scripts/build.mjs>
 ```
 
-Push to `main` directly (authorised by Antoine for this repo). One logical change
-per commit.
+One logical change per commit. Push to `dev`, check `games-dev.jnssn.io`, then
+merge into `main` — including for a one-line config change, because the merge is
+the only thing that makes `main` a branch that has been looked at.
 
 ---
 

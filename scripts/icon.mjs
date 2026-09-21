@@ -1,23 +1,9 @@
-// Generates home-screen icons as real PNGs, with no dependencies, because the
-// Cloudflare Pages build has no install step.
-//
-// iOS only accepts PNG for apple-touch-icon — an SVG there is silently ignored
-// and the home screen falls back to a screenshot of the page. Rasterising text
-// would need a font engine, so an app picks a named mark from GLYPHS below and
-// that path is filled here.
-//
-// Cost matters: this runs once per app per build. One master is rasterised at
-// high resolution and every smaller size is box-filtered down from it, which is
-// both far cheaper than rasterising each size and better-looking, since the
-// downscale is itself the antialiasing.
+// Home-screen icons as real PNGs, with no dependencies: iOS ignores SVG for
+// apple-touch-icon. See CLAUDE.md, "Offline and Add to Home Screen".
 
 import { deflateSync } from 'node:zlib';
 
-/* ---------- marks ----------
-   Filled paths on a 24x24 grid, centred on (12,12). Keep them solid shapes:
-   the rasteriser fills, it does not stroke. Add to this list rather than
-   inventing per-app artwork, so the set stays coherent at a hundred games. */
-
+// Filled paths on a 24x24 grid. The rasteriser fills, it does not stroke.
 export const GLYPHS = {
   spade:  'M12 2C12 2 4 8.5 4 13.5C4 16.5 6.2 18.5 8.6 18.5C10 18.5 11 17.9 11.6 17C11.4 19 10.6 20.4 9 21.2L9 22L15 22L15 21.2C13.4 20.4 12.6 19 12.4 17C13 17.9 14 18.5 15.4 18.5C17.8 18.5 20 16.5 20 13.5C20 8.5 12 2 12 2Z',
   heart:  'M12 21C12 21 3 14.7 3 9.2C3 6.3 5.2 4.2 7.9 4.2C9.7 4.2 11.2 5.2 12 6.6C12.8 5.2 14.3 4.2 16.1 4.2C18.8 4.2 21 6.3 21 9.2C21 14.7 12 21 12 21Z',
@@ -40,8 +26,6 @@ export const GLYPHS = {
 };
 
 export const GLYPH_NAMES = Object.keys(GLYPHS);
-
-/* ---------- PNG container ---------- */
 
 const CRC = (() => {
   const t = new Int32Array(256);
@@ -88,10 +72,7 @@ function encodePng(size, pixels) {
   ]);
 }
 
-/* ---------- path parsing ----------
-   Supports M/L/H/V/C/S/Q/T/A/Z in both cases, which is everything the marks
-   above use. Curves are flattened to line segments; arcs become polylines. */
-
+// M/L/H/V/C/S/Q/T/A/Z, with curves flattened to line segments.
 function parsePath(d) {
   const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|-?\d*\.?\d+(?:e[-+]?\d+)?/gi) || [];
   const polys = [];
@@ -117,7 +98,6 @@ function parsePath(d) {
     cubic(x + (2 / 3) * (x1 - x), y + (2 / 3) * (y1 - y),
           x2 + (2 / 3) * (x1 - x2), y2 + (2 / 3) * (y1 - y2), x2, y2);
 
-  // Endpoint-parameterised arc, per the SVG implementation notes.
   const arc = (rx, ry, rot, large, sweep, ex, ey) => {
     if (!rx || !ry) return lineTo(ex, ey);
     const phi = (rot * Math.PI) / 180, cp = Math.cos(phi), sp = Math.sin(phi);
@@ -174,7 +154,6 @@ function parsePath(d) {
   return polys;
 }
 
-// Even-odd coverage of one scanline sample against the flattened polygons.
 function crossings(polys, py) {
   const xs = [];
   for (const poly of polys) {
@@ -188,8 +167,6 @@ function crossings(polys, py) {
   }
   return xs.sort((a, b) => a - b);
 }
-
-/* ---------- colour ---------- */
 
 function hash(s) {
   let h = 2166136261;
@@ -206,13 +183,9 @@ function hslToRgb(h, s, l) {
   return [f(0), f(8), f(4)];
 }
 
-// Hues are picked from a fixed wheel rather than hash % 360 so that no app
-// lands on the muddy yellow-green band, and neighbouring slugs stay distinct.
+// A fixed wheel, not hash % 360, so no app lands on the muddy yellow-green band.
 const HUES = [222, 258, 292, 330, 352, 14, 32, 174, 196, 208];
 
-// The one hue an app is identified by. The icon, the theme colour and the UI
-// kit's accent all read it, so a game looks like its own icon without anyone
-// choosing a colour by hand.
 export function hueFor(slug) {
   return HUES[hash(slug) % HUES.length];
 }
@@ -221,8 +194,6 @@ export function themeColor(slug) {
   const [r, g, b] = hslToRgb(hueFor(slug), 0.5, 0.32);
   return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 }
-
-/* ---------- render ---------- */
 
 const MASTER = 512;
 const SS = 2;                 // supersampling per axis on the master only
@@ -235,10 +206,8 @@ function roundedTile(x, y, r) {
   return dx * dx + dy * dy <= r * r;
 }
 
-// An icon is fully determined by its glyph, its hue and whether it is maskable
-// — never by the slug itself. Memoising on that key makes the cost of a build
-// scale with the VARIETY of icons (at most GLYPH_NAMES x HUES x 2) rather than
-// with the number of apps, which is what matters at a few hundred games.
+// Keyed on glyph|hue|maskable, never on slug, so build cost scales with the
+// variety of icons rather than with the number of apps.
 const masterCache = new Map();
 
 function renderMaster(slug, glyph, maskable, bare) {
@@ -257,8 +226,6 @@ function buildMaster(slug, glyph, maskable, bare) {
   const mid = hslToRgb(HUES[h % HUES.length], 0.68, 0.56);   // bare mode only
   const polys = parsePath(GLYPHS[glyph] || GLYPHS.mark);
 
-  // A maskable icon is cropped to a circle by the launcher, so the tile bleeds
-  // to the edges and the mark is drawn smaller to stay inside the safe zone.
   const radius = maskable ? 0 : 0.26;
   const inset = maskable ? 1 : 0.94;
   const glyphSpan = maskable ? 0.46 : 0.62;   // half-width of the mark, 0..1
@@ -268,8 +235,6 @@ function buildMaster(slug, glyph, maskable, bare) {
   const scale = (glyphSpan * size) / 12;      // the 24-unit grid, centred
   const cx = size / 2, cy = size / 2;
 
-  // Precompute glyph crossings per subsample row: the expensive part is the
-  // edge walk, and it is identical for every pixel in a row.
   const rows = size * SS;
   const rowXs = new Array(rows);
   for (let r = 0; r < rows; r++) {
@@ -299,13 +264,6 @@ function buildMaster(slug, glyph, maskable, bare) {
       const ta = tile / n, ma = (mark / n) * ta;
       const p = (y * size + x) * 4;
       if (bare) {
-        // No tile: the mark alone over transparency. It has to read on both
-        // grounds — a dark card in the catalogue and a white one in light
-        // mode — so it takes a mid-lightness version of the hue rather than
-        // the dark tile colour or the near-white mark colour, either of which
-        // disappears against one of the two. Coverage goes to alpha, and the
-        // colour is written at full strength, so edges stay clean instead of
-        // fringing toward a background that is not there.
         px[p] = mid[0]; px[p + 1] = mid[1]; px[p + 2] = mid[2];
         px[p + 3] = Math.round(255 * ma);
       } else {
@@ -319,8 +277,6 @@ function buildMaster(slug, glyph, maskable, bare) {
   return px;
 }
 
-// Box filter. The master is 512, so every target divides into a clean window
-// and the average is both correct and the antialiasing for the smaller sizes.
 function downscale(src, from, to) {
   if (from === to) return src;
   const out = Buffer.alloc(to * to * 4);
@@ -343,22 +299,14 @@ function downscale(src, from, to) {
   return out;
 }
 
-/**
- * Renders one master per variant and derives every requested size from it.
- * @returns {Map<string, Buffer>} keyed "<size>" and "<size>m" for maskable
- */
 export function iconSet(slug, glyph, sizes, maskableSizes = [], bareSizes = []) {
   const out = new Map();
   const g = GLYPHS[glyph] ? glyph : 'mark';
   const hue = hash(slug) % HUES.length;
   const take = (want, mask, label) => {
     for (const s of want) {
-      // Two sizes never go bare, whatever the app asks for:
-      //   - the maskable one, which the Android launcher crops and fills;
-      //   - apple-touch-icon, because iOS composites transparency onto BLACK
-      //     rather than honouring it, so a bare icon there is not "no tile",
-      //     it is a black tile chosen by the OS instead of by us.
-      // Which sizes may go bare is the caller's decision; see build.mjs.
+      // Never bare: the maskable icon, which the launcher crops and fills, and
+      // apple-touch-icon, because iOS composites transparency onto black.
       const b = !mask && bareSizes.includes(s);
       const key = g + '|' + hue + '|' + (mask ? 1 : 0) + '|' + s + '|' + (b ? 'b' : '');
       let png = pngCache.get(key);
@@ -376,7 +324,6 @@ export function iconSet(slug, glyph, sizes, maskableSizes = [], bareSizes = []) 
 
 const pngCache = new Map();
 
-// Deterministic fallback so an app that names no mark still gets a sensible one.
 export function defaultGlyph(slug) {
   return GLYPH_NAMES[hash(slug + '#g') % GLYPH_NAMES.length];
 }

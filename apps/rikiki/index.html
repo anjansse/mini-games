@@ -15,35 +15,26 @@
   color-scheme:light dark;
   --h:352;
 
-  /* surfaces — neutrals carry a slight cool bias so they read as chosen */
   --bg:#F4F5F8; --surface:#FFFFFF; --raised:#FFFFFF; --inset:#EDEFF4;
   --line:#DFE3EC; --line-soft:#EAEDF3;
 
-  /* ink */
   --text:#14161C; --dim:#5C6376; --faint:#8C93A6;
 
-  /* accent, from the app's own hue */
   --accent:hsl(var(--h) 64% 42%);
   --accent-ink:#FFFFFF;
   --accent-wash:hsl(var(--h) 72% 96%);
   --accent-edge:hsl(var(--h) 52% 84%);
 
-  /* semantic — separate from the accent on purpose */
   --pos:hsl(152 58% 32%); --neg:hsl(356 68% 46%);
   --pos-wash:hsl(152 52% 95%); --neg-wash:hsl(356 82% 96%);
 
-  /* elevation. The inner top highlight is what makes a panel read as a
-     physical object instead of a flat rectangle; it matters most in dark. */
   --lift:0 1px 2px hsl(var(--h) 24% 12% / .06), 0 4px 14px hsl(var(--h) 24% 12% / .05);
   --lift-hi:0 2px 4px hsl(var(--h) 24% 12% / .08), 0 12px 32px hsl(var(--h) 24% 12% / .10);
   --edge:inset 0 1px 0 hsl(0 0% 100% / .7);
 
-  /* geometry */
   --r-sm:9px; --r:14px; --r-lg:20px; --r-full:999px;
   --tap:48px;
 
-  /* motion. Expo-out for movement, a slight overshoot for presses. Both are
-     applied to transform and opacity only, so they stay on the compositor. */
   --fast:130ms; --mid:220ms; --slow:340ms;
   --ease:cubic-bezier(.16,1,.3,1);
   --spring:cubic-bezier(.34,1.42,.64,1);
@@ -94,7 +85,7 @@ h3{font-size:15px}
 .stack-lg{display:flex;flex-direction:column;gap:22px}
 hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 
-/* --- surfaces --------------------------------------------------------- */
+/* surfaces */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--lift),var(--edge)}
 .card.flat{box-shadow:none}
 .card.quiet{background:transparent;box-shadow:none;border-color:var(--line-soft)}
@@ -104,25 +95,13 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 
 .row{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:var(--tap)}
 .grow{min-width:0;flex:1}
-/* display:block so these read the same whether the app emits div or span.
-   Wrapping is the default: a settings label like "Points lost per trick off"
-   is longer than its track and clipping it to "Points lost per tric…" hides
-   the thing being set. Add .one where a single line is genuinely wanted and
-   the text is known to be short, such as a player's name. */
 .row .title{display:block;font-weight:600}
 .row .title.one{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sub{display:block;font-size:13px;color:var(--dim);margin-top:1px}
-/* Neutral, not accent-washed. An app whose hue is in the red band — rikiki is
-   352 — otherwise gets a red row, and a red row reads as "you did something
-   wrong" rather than "this is the one to look at". Say WHY a row is marked in
-   words; do not make the colour carry it. */
 .row.lead{background:var(--inset)}
 
-/* --- controls ---------------------------------------------------------- */
+/* controls */
 button,input,select{font:inherit;color:inherit}
-/* touch-action:manipulation removes the double-tap-to-zoom gesture, so tapping
-   + four times in a second counts four times instead of zooming the page.
-   user-select stops the same rapid tapping from selecting the label. */
 button,a,.tile,summary{touch-action:manipulation}
 button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-select:none}
 .btn{
@@ -141,8 +120,6 @@ button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-s
 .btns{display:grid;gap:10px}
 .btns.two{grid-template-columns:1fr 1fr}
 
-/* Stepper. The value is the biggest thing in the row because it is the thing
-   being read back; the buttons are quiet until touched. */
 .stepper{display:flex;align-items:center;gap:2px;flex:none;background:var(--inset);border-radius:var(--r-full);padding:3px}
 .stepper button{
   width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:50%;
@@ -166,7 +143,6 @@ button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-s
 .toggle[aria-pressed="true"]{background:var(--accent);box-shadow:none}
 .toggle[aria-pressed="true"]::after{transform:translateX(20px)}
 
-/* Segmented control — the language bar and any 2-3 way choice. */
 .seg{display:flex;background:var(--inset);border-radius:var(--r-full);padding:3px;gap:2px;flex:none}
 .seg button{
   border:0;background:transparent;color:var(--dim);cursor:pointer;border-radius:var(--r-full);
@@ -188,18 +164,13 @@ button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-s
   display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--r-full);
   background:var(--inset);color:var(--dim);font-size:12.5px;font-weight:600;white-space:nowrap;
 }
-/* Outlined, not filled. Red/green are reserved for good/bad, and an app whose
-   own hue lands in the red band (rikiki is 352) would otherwise have its
-   accent chip read as a failure. Semantic colour stays semantic. */
 .chip.on{background:transparent;color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-edge)}
 .chip.bad{background:var(--neg-wash);color:var(--neg)}
 .chip.good{background:var(--pos-wash);color:var(--pos)}
 
 :where(a,button,input,select,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-sm)}
 
-/* --- progress ----------------------------------------------------------
-   Dots, not a bar: a game has a countable number of rounds, and the count is
-   information the player wants. Past 14 it falls back to a bar. */
+/* progress: dots up to 14 rounds, a bar past that */
 .dots{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .dots i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:transform var(--mid) var(--spring),background var(--mid) linear}
 .dots i.done{background:var(--accent);opacity:.45}
@@ -207,14 +178,14 @@ button,.seg,.stepper,.toggle,.tabs,.dots,.appbar{-webkit-user-select:none;user-s
 .bar{height:5px;border-radius:var(--r-full);background:var(--line);overflow:hidden}
 .bar>i{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width var(--slow) var(--ease)}
 
-/* --- table -------------------------------------------------------------- */
+/* table */
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
 th,td{padding:9px 10px;text-align:center;white-space:nowrap;border-top:1px solid var(--line-soft)}
 thead th{position:sticky;top:0;background:var(--surface);font-size:13px;font-weight:600;border-top:0;border-bottom:1px solid var(--line);vertical-align:bottom}
 tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);font-size:12.5px;font-weight:500;text-align:left;width:1%}
 
-/* --- feedback ----------------------------------------------------------- */
+/* feedback */
 .empty{padding:26px 18px;text-align:center;color:var(--dim);font-size:14.5px}
 #toast{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;pointer-events:none;z-index:40;padding:0 14px}
 #toast .t{
@@ -230,7 +201,7 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 @keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes toast-out{to{opacity:0;transform:translateY(8px) scale(.98)}}
 
-/* --- motion ------------------------------------------------------------- */
+/* motion */
 @keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 .rise{animation:rise var(--slow) var(--ease) both}
 .rise:nth-child(2){animation-delay:40ms}
@@ -238,9 +209,7 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 .rise:nth-child(4){animation-delay:120ms}
 .rise:nth-child(5){animation-delay:160ms}
 
-/* --- app shell ----------------------------------------------------------
-   Every app has a bar and a stack of screens, whatever it is a game of. An
-   app that hand-rolls these is the first step towards five design systems. */
+/* app shell */
 .appbar{
   position:sticky;top:0;z-index:20;
   display:flex;align-items:center;gap:10px;
@@ -252,8 +221,6 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 }
 .appbar.stuck{border-bottom-color:var(--line)}
 .appbar h1{font-size:19px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Not scoped to .appbar: the index and the 404 page want the same icon button
-   without pretending to have an app bar. */
 .act{
   width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;
   background:transparent;color:var(--dim);cursor:pointer;text-decoration:none;
@@ -261,58 +228,23 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
 }
 .act:active{transform:scale(.88);background:var(--inset)}
 .act:hover{color:var(--text)}
-/* Chrome controls that sit together — the language toggle and the theme
-   button — so they read as one group rather than two loose objects. */
 .chrome{display:flex;align-items:center;gap:4px;flex:none}
 
-/* Screens are siblings; exactly one is visible. Toggle with el.hidden, never
-   style.display, so assistive tech follows along. */
 .screen[hidden]{display:none}
 .screen:focus{outline:none}
 .screen{animation:rise var(--slow) var(--ease) both}
 
-/* --- dialog -------------------------------------------------------------
-   Native <dialog>: focus trapping, Esc to close and inertness come free and
-   correct. Hand-rolled modals get all three wrong. */
-/* The dialog IS the viewport, and the sheet is bounded by the dialog.
-
-   It used to be sized with 88svh. A viewport unit is the browser's idea of
-   the viewport, not the area actually on screen, and on iOS those disagree
-   while the URL bar is settling. A bottom-anchored sheet taller than the
-   visible area has its TOP cut off, so it opens showing its last rows, and
-   snaps to its heading when the viewport settles — which reads exactly like
-   the content having been scrolled, and is why every scrollTop fix missed it.
-
-   inset:0 with height:100% makes the dialog the real viewport box for a
-   top-layer element, and max-height:100% of that can never exceed the screen
-   however the URL bar behaves. No vh unit is involved any more. */
+/* Sheets FADE; they never slide, and the box is sized in svh rather than
+   inset:0 — WebKit mis-places a transformed or clipped box inside a <dialog>.
+   Both are load-bearing; see CLAUDE.md, "The UI kit". */
 dialog.sheet{
   border:0;padding:0;background:transparent;margin:0;
   position:fixed;top:0;left:0;right:0;bottom:auto;
   width:100%;max-width:none;
-  /* 100svh, not inset:0. A fixed element with inset:0 covers the LAYOUT
-     viewport, which on iOS is taller than the area actually on screen while
-     the URL bar is showing — so a bottom-anchored sheet sat partly below the
-     screen and shifted every time the bar animated. svh is the SMALL
-     viewport: the smallest the visible area ever gets, so a box that size
-     anchored at the top is always fully on screen and never moves when the
-     bar does. Stable beats exact here; a strip of page below the sheet when
-     the bar is hidden is far better than a sheet that jumps. */
   height:100svh;max-height:100svh;
   overflow:hidden;
 }
-/* Scoped to [open] so the UA's display:none for a closed dialog still wins.
-   display:block, NOT flex. The sheet is placed with position:absolute rather
-   than align-items:flex-end, because WebKit mis-places a flex item that is
-   aligned to flex-end AND transformed: measured on an iPhone, the slide ran
-   from +639 (one height below) straight past zero to -639 (one height ABOVE
-   its resting place), so the sheet shot up past where it belonged and came
-   back. An absolutely positioned box transforms predictably. */
 dialog.sheet[open]{display:block}
-/* The sheet is focused programmatically on open, for the keyboard and to keep
-   the browser from scrolling a control into view. That is not a navigation, so
-   it must not draw a focus ring — Safari puts its blue UA outline on any
-   tabindex element that takes focus, which framed the whole dialog. */
 dialog.sheet>.body:focus,dialog.sheet>.body:focus-visible{outline:none}
 dialog.sheet::backdrop{background:#0009;backdrop-filter:blur(3px);animation:fade var(--mid) var(--ease) both}
 dialog.sheet>.body{
@@ -321,24 +253,7 @@ dialog.sheet>.body{
   background:var(--raised);border:1px solid var(--line);border-bottom:0;
   border-radius:var(--r-lg) var(--r-lg) 0 0;box-shadow:var(--lift-hi),var(--edge);
   padding:8px 16px calc(20px + env(safe-area-inset-bottom,0px));
-  /* 88% OF THE DIALOG, which is exactly the viewport — the same proportion
-     88svh was reaching for, but measured against the real box rather than the
-     browser's idea of the viewport, so it shrinks with the screen instead of
-     overflowing it. Leaves a strip of backdrop above, so the page behind is
-     still visible and the sheet reads as sitting on top of it. */
   max-height:88%;overflow-y:auto;overscroll-behavior:contain;
-  /* Opening and closing FADE; they do not slide.
-
-     A transformed sheet is mis-placed by WebKit mid-transition — measured on
-     an iPhone, the slide ran from one height below its resting place to one
-     height above it before settling — and that transient is the jump. Six
-     attempts at making the slide behave failed; a fade cannot be mis-placed
-     because nothing moves. The transform transition stays only for the drag,
-     which is driven by the finger and has never misbehaved.
-
-     A transition, never an animation: a CSS animation with fill-mode:both
-     outranks inline styles, so a keyframe here would discard every transform
-     the drag sets. */
   transition:opacity var(--mid) var(--ease),transform var(--mid) var(--ease);
 }
 dialog.sheet>.body::before{
@@ -348,14 +263,11 @@ dialog.sheet>.body::before{
 dialog.sheet h2{margin-bottom:12px}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media (min-width:520px){
-  /* Still bottom-anchored on a wide screen, just lifted off the edge. Centring
-     it would need a second translate, and stacking another transform on the
-     one that animates is exactly what went wrong on the phone. */
   dialog.sheet>.body{bottom:24px;border-radius:var(--r-lg);border-bottom:1px solid var(--line)}
   dialog.sheet>.body::before{display:none}
 }
 
-/* --- tabs ---------------------------------------------------------------- */
+/* tabs */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs button{
@@ -366,9 +278,7 @@ dialog.sheet h2{margin-bottom:12px}
 }
 .tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* --- board --------------------------------------------------------------
-   A square grid, for anything played on tiles: words, memory, puzzles,
-   minesweeper. Set --cols; the cells size themselves. */
+/* board: set --cols; the cells size themselves */
 .board{display:grid;grid-template-columns:repeat(var(--cols,4),1fr);gap:var(--gap,8px)}
 .tile{
   aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--line);
@@ -381,21 +291,17 @@ dialog.sheet h2{margin-bottom:12px}
 .tile:disabled{opacity:.4;cursor:default}
 .tile.flat{background:var(--inset);box-shadow:none}
 
-/* --- stat ---------------------------------------------------------------
-   For the one or two figures that ARE the point of the screen. Used for
-   everything, it flattens the hierarchy instead of creating one. */
+/* stat: for the one or two figures that ARE the point of the screen */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px}
 .stat{padding:14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);box-shadow:var(--edge)}
 .stat .k{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
 .stat .v{display:block;font-size:30px;font-weight:700;letter-spacing:-.03em;margin-top:3px;font-variant-numeric:tabular-nums}
 
-/* Anything a screen reader must hear but nobody should see. */
+/* visually hidden, but announced */
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
-/* Installed to the Home Screen: no browser chrome, so the bar carries more. */
 @media (display-mode:standalone){.appbar{padding-top:calc(14px + env(safe-area-inset-top,0px))}}
 
-/* Cross-screen transitions. Supported browsers animate; the rest just swap. */
 ::view-transition-old(root){animation:vt-out var(--mid) var(--ease) both}
 ::view-transition-new(root){animation:vt-in var(--slow) var(--ease) both}
 @keyframes vt-out{to{opacity:0;transform:translateY(-6px)}}
@@ -407,43 +313,27 @@ dialog.sheet h2{margin-bottom:12px}
 }
 /* ==== /jnssn-ui css ==== */
 
-/* ---------- rikiki's own CSS ----------
-   Everything above belongs to scripts/ui.mjs. These are the few things only a
-   trick-taking score sheet needs; all of them are built from the kit's tokens. */
+/* ---------- rikiki's own CSS, built from the kit's tokens ---------- */
 
-/* The round header: the card count is the single biggest thing on the screen,
-   because it is what players look up between every hand. */
 .roundhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .cards{font-size:34px;font-weight:700;letter-spacing:-.03em;margin-top:2px}
 .meta{font-size:13.5px;color:var(--dim);text-align:right;line-height:1.5}
 .meta b{color:var(--text);font-weight:600}
 
-/* One row per player. The value is the biggest thing in it, being what gets
-   read back around the table. */
 .who{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .av{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
   background:var(--inset);color:var(--dim);font-size:13px;font-weight:700}
-/* Marked, not alarmed: the row's own background plus the "deals" chip
-   already say which player it is, so the avatar only firms up rather than
-   turning the accent colour. */
 .row.lead .av{background:var(--line);color:var(--text)}
 
-/* The sheet. First column sticks so a name stays attached to its score when
-   six players push the table sideways. */
 .tot{display:block;font-size:22px;font-weight:700;margin-top:2px;letter-spacing:-.03em}
 thead th.first .tot{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-/* Not scoped to td: the round column is a <th scope="row">, and scoping these
-   to td is what made the number run into its label ("11 card"). */
 .d{display:block;font-size:16px;font-weight:600}
 .bm{display:block;font-size:11.5px;color:var(--faint);margin-top:1px;font-weight:400}
 
-/* Standings. Rank and points bracket the name. */
 .rank{font-size:22px;font-weight:700;width:26px;flex:none;color:var(--faint);font-variant-numeric:tabular-nums}
 .row.first .rank{color:var(--accent)}
 .pts{font-size:26px;font-weight:700;flex:none;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 
-/* Past games, collapsed. The kit has no accordion; this is the one place that
-   wants one, so it stays local rather than going into the kit for a single use. */
 details.past{border-top:1px solid var(--line-soft)}
 details.past:first-child{border-top:0}
 details.past summary{list-style:none;cursor:pointer;padding:12px 14px;min-height:var(--tap);display:flex;flex-direction:column;justify-content:center}
@@ -462,10 +352,8 @@ details.past[open] summary{background:var(--inset)}
 .x:active{transform:scale(.88);color:var(--neg)}
 </style>
 <script>
-/* Shared language runtime. The key is origin-wide, so choosing a language here
-   also changes the index and every other game. Kept inside the app rather than
-   injected at build time so that opening this file straight from a git clone
-   still works. */
+// Shared language and theme runtimes. Carried inline rather than injected at
+// build time, so opening this file from a git clone still works.
 (function(){
   var K='jnssn-lang', LANGS=['en','fr'], DEF='en';
   function stored(){ try{ return localStorage.getItem(K); }catch(e){ return null; } }
@@ -501,7 +389,6 @@ details.past[open] summary{background:var(--inset)}
   window.JTheme={
     modes:MODES,
     get:function(){ return cur; },
-    // What the page actually renders as, once "auto" is resolved.
     resolved:function(){
       if(cur!=='auto') return cur;
       return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
@@ -531,7 +418,7 @@ details.past[open] summary{background:var(--inset)}
 
 <main class="wrap">
 
-  <!-- ===== setup ===== -->
+  <!-- setup -->
   <section class="screen stack-lg" id="setup">
     <div>
       <h2 id="whoh">Who plays?</h2>
@@ -545,7 +432,8 @@ details.past[open] summary{background:var(--inset)}
     <div id="hist-setup"></div>
   </section>
 
-  <!-- ===== game ===== -->
+
+  <!-- game -->
   <section class="screen stack-lg" id="game" hidden>
     <div>
       <div class="roundhead">
@@ -582,7 +470,8 @@ details.past[open] summary{background:var(--inset)}
     </div>
   </section>
 
-  <!-- ===== done ===== -->
+
+  <!-- done -->
   <section class="screen stack-lg" id="done" hidden>
     <div>
       <h2 id="doneh" style="font-size:28px"></h2>
@@ -602,9 +491,8 @@ details.past[open] summary{background:var(--inset)}
   </section>
 </main>
 
-<!-- Game rules. A sheet rather than a <details> block: the rules are read once
-     at the start and then never again, so they should not take up room on the
-     setup screen for the rest of the game. -->
+<!-- Game rules: a sheet, not a block on the setup screen, because they are
+     read once at the start and then never again. -->
 <dialog class="sheet" id="rules">
   <div class="body">
     <h2 id="rulesh"></h2>
@@ -663,9 +551,8 @@ details.past[open] summary{background:var(--inset)}
   </div>
 </dialog>
 
-<!-- One confirm, reused. Stopping a game and clearing the history are both
-     destructive and not undoable in one tap, which is the case a dialog is
-     actually for; everything else uses an undo toast instead. -->
+<!-- One confirm, reused. Only the two destructive, un-undoable actions use it;
+     everything else offers an undo toast instead. -->
 <dialog class="sheet" id="confirm">
   <div class="body">
     <h2 id="confirmh"></h2>
@@ -682,16 +569,11 @@ details.past[open] summary{background:var(--inset)}
 (function(){
   var reduce = matchMedia('(prefers-reduced-motion: reduce)');
 
-  /* Swap a view with a transition where the browser has one. Safari 18+,
-     Chrome 111+; everywhere else the callback simply runs. */
   function swap(fn){
     if(reduce.matches || !document.startViewTransition){ fn(); return; }
     document.startViewTransition(fn);
   }
 
-  /* Update in place. Rebuilding a screen with innerHTML on every tap throws
-     away focus, scroll position and screen-reader context, and makes animation
-     impossible — so text that changes goes through here instead. */
   function setText(el, v){
     if(!el) return;
     v = String(v);
@@ -704,8 +586,6 @@ details.past[open] summary{background:var(--inset)}
     else if(el.getAttribute(k) !== String(v)) el.setAttribute(k, v);
   }
 
-  /* One toast at a time, with an optional undo. Undo beats a confirmation
-     dialog: it costs one tap instead of two and never blocks the screen. */
   var host, timer, cur;
   function toast(msg, opts){
     opts = opts || {};
@@ -732,10 +612,6 @@ details.past[open] summary{background:var(--inset)}
     setTimeout(function(){ if(box.parentNode) box.parentNode.removeChild(box); }, 220);
   }
 
-  /* Show one .screen, hide its siblings. Focus moves to the new screen and
-     scroll returns to the top — what a native app does on a push, and what a
-     hand-rolled swap always forgets, leaving the keyboard user stranded where
-     the old screen used to be. */
   function screen(id){
     var next = typeof id === 'string' ? document.getElementById(id) : id;
     if(!next || next.dataset.cur === '1') return;
@@ -749,31 +625,15 @@ details.past[open] summary{background:var(--inset)}
     });
   }
 
-  /* Open a <dialog> as a bottom sheet. Native dialog gives focus trapping,
-     Esc and inert background for free; this only adds the exit animation and
-     a tap-outside-to-close that matches what a phone user expects. */
   function openSheet(el){
     el = typeof el === 'string' ? document.getElementById(el) : el;
     if(!el || el.open) return;
     el.showModal();
     var body = el.querySelector('.body');
     if(body){
-      /* Focus the sheet itself, not whatever control happens to be first.
-
-         showModal() autofocuses, and the browser then scrolls that control
-         into view. Safari resolves this a frame LATE — by which time the
-         sheet is sitting at translateY(100%), off the bottom of the screen —
-         so it scrolls the sheet's own content to the end trying to reveal it,
-         and the sheet opens showing its last row instead of its heading.
-         Focusing the container with preventScroll removes the reason to
-         scroll at all, and is better for a keyboard user anyway: focus starts
-         at the sheet and Tab moves into it. */
       if(!body.hasAttribute('tabindex')) body.setAttribute('tabindex','-1');
       body.focus({preventScroll:true});
 
-      // A sheet opens at the top, never where it was left. This must run
-      // AFTER showModal: a closed <dialog> is display:none, and scrollTop on
-      // a display:none element does nothing.
       body.scrollTop = 0;
       body.style.animation = '';
       body.style.transform = '';                 // never mid-slide any more
@@ -786,14 +646,6 @@ details.past[open] summary{background:var(--inset)}
         body.style.opacity = '';
       });
 
-      /* Hold the scroll at the top while the sheet settles.
-
-         Cheap insurance against the browser scrolling something into view
-         as the sheet appears, which once left it opening on its last row.
-         rAF runs before paint, so a correction here lands in the same frame;
-         a scroll listener fires a frame late and the wrong frame is seen.
-         Do NOT reach for overflow:clip instead — WebKit mis-places a clipped
-         box and that cure was worse than the disease. */
       (function(){
         var until = performance.now() + 420;
         (function pin(){
@@ -804,52 +656,41 @@ details.past[open] summary{background:var(--inset)}
       })();
 
     }
-    el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
+    // Not {once:true}: a tap on a control inside the sheet bubbles to the
+    // dialog and would consume it, leaving tap-outside dead for that open.
+    if(el.dataset.backdrop !== '1'){
+      el.dataset.backdrop = '1';
+      el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); });
+    }
     dragSheet(el);
   }
 
-  /* Drag the sheet down to dismiss it.
-
-     Dragging a sheet downwards is what a phone user tries first, and without
-     this the gesture falls through to the page behind and pulls it to refresh
-     — losing the game instead of closing the sheet. touchmove is therefore
-     non-passive and preventDefault()s while the drag is live, which is what
-     actually stops the refresh; overscroll-behavior alone does not.
-
-     The drag only starts when the sheet's own content is already scrolled to
-     the top, so a long settings list still scrolls normally. */
   function dragSheet(el){
     var body = el.querySelector('.body');
     if(!body || body.dataset.drag === '1') return;
     body.dataset.drag = '1';
-    var y0 = 0, dy = 0, live = false;
+    var y0 = 0, dy = 0, dragging = false;
 
     body.addEventListener('touchstart', function(e){
       if(e.touches.length !== 1 || body.scrollTop > 0) return;
-      y0 = e.touches[0].clientY; dy = 0; live = true;
+      y0 = e.touches[0].clientY; dy = 0; dragging = true;
       body.style.transition = 'none';
     }, {passive:true});
 
     body.addEventListener('touchmove', function(e){
-      if(!live) return;
+      if(!dragging) return;
       dy = e.touches[0].clientY - y0;
       if(dy <= 0){
-        // Dragging up again: hand the gesture back to normal scrolling.
-        if(body.scrollTop > 0){ live = false; body.style.transition = ''; body.style.transform = ''; }
+        if(body.scrollTop > 0){ dragging = false; body.style.transition = ''; body.style.transform = ''; }
         return;
       }
       e.preventDefault();
-      // Past the threshold it tracks the finger 1:1; before it, a little
-      // resistance so a stray few pixels do not look like the sheet is loose.
       body.style.transform = 'translateY(' + (dy < 24 ? dy * 0.5 : dy - 12) + 'px)';
     }, {passive:false});
 
     function end(){
-      if(!live) return;
-      live = false;
-      // Past the threshold, hand straight over to closeSheet, which carries on
-      // downwards from the current offset. Snapping back to 0 first is what
-      // produced the down-up-down stutter.
+      if(!dragging) return;
+      dragging = false;
       if(dy > 96){ closeSheet(el); return; }
       body.style.transition = 'transform var(--mid) var(--ease)';
       body.style.transform = '';
@@ -864,8 +705,6 @@ details.past[open] summary{background:var(--inset)}
     if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
     if(body.dataset.closing === '1') return;      // one close, not one per tap
     body.dataset.closing = '1';
-    // Fades from wherever it is, including part-way through a drag, so a
-    // dragged sheet finishes rather than snapping back first.
     body.style.transition = 'opacity var(--fast) var(--ease)';
     body.style.opacity = '0';
     setTimeout(function(){
@@ -875,8 +714,6 @@ details.past[open] summary{background:var(--inset)}
     }, 160);
   }
 
-  /* Announce something to a screen reader without showing it. A score that
-     only changes visually is a score a blind player never hears. */
   var liveEl;
   function live(msg){
     if(!liveEl){
@@ -888,7 +725,6 @@ details.past[open] summary{background:var(--inset)}
     setTimeout(function(){ liveEl.textContent = msg; }, 60);
   }
 
-  /* One icon set, so no app hand-writes another plus sign. 24x24, currentColor. */
   var P = {
     plus:'M12 5v14M5 12h14', minus:'M5 12h14', check:'M4 12.5l5.5 5.5L20 7',
     x:'M6 6l12 12M18 6L6 18', back:'M15 5l-7 7 7 7', next:'M9 5l7 7-7 7',
@@ -910,10 +746,6 @@ details.past[open] summary{background:var(--inset)}
       '<path d="' + d + '"/></svg>';
   }
 
-  /* Wire a button to cycle auto -> light -> dark. One button rather than three
-     because the bar has no room for a segmented control next to the language
-     one; the glyph shows the CURRENT state and the label names it, so nothing
-     depends on the player guessing what a half-filled circle means. */
   var THEME_LABEL = {
     en:{auto:'Theme: follow the phone', light:'Theme: light', dark:'Theme: dark'},
     fr:{auto:'Thème : selon le téléphone', light:'Thème : clair', dark:'Thème : sombre'}
@@ -937,7 +769,6 @@ details.past[open] summary{background:var(--inset)}
     paint();
   }
 
-  /* The app bar gains its rule only once the page is actually scrolled. */
   function bar(){
     var b = document.querySelector('.appbar'); if(!b) return;
     var on = false;
@@ -963,12 +794,8 @@ details.past[open] summary{background:var(--inset)}
 (function(){
   var KEY = 'rikiki-v1';   // unchanged so a game in progress survives updates
 
-  /* ---------- strings ----------
-     Plural categories come from Intl.PluralRules, which implements the Unicode
-     CLDR plural rules and is built into every browser. Do NOT hand-roll them:
-     French counts 0 and 1 as singular ("0 carte", "1 carte", "2 cartes") while
-     English counts only 1 ("0 cards", "1 card"), and other languages have up to
-     six categories. A plural entry is an object keyed by CLDR category. */
+  // Anything counted goes through Intl.PluralRules (CLDR): French counts 0 and
+  // 1 as singular, English only 1. Never hand-roll `n > 1`.
   var PR = {};
   function rules(l){
     if(!(l in PR)){ try{ PR[l] = new Intl.PluralRules(l); }catch(e){ PR[l] = null; } }
@@ -1093,9 +920,6 @@ details.past[open] summary{background:var(--inset)}
   };
   function lang(){ return window.JLang ? window.JLang.get() : 'en'; }
   function D(){ return L[lang()] || L.en; }
-  /* t('key')            -> a plain string
-     t('key', a, b)      -> a string that takes arguments
-     t('pluralKey', n)   -> "n form", with the form chosen by CLDR rules */
   function t(k){
     var v = D()[k];
     if(v && typeof v === 'object' && v.other !== undefined) return plural(lang(), arguments[1], v);
@@ -1103,9 +927,8 @@ details.past[open] summary{background:var(--inset)}
     return v.apply(null, Array.prototype.slice.call(arguments, 1));
   }
 
-  /* ---------- state ----------
-     The saved shape is unchanged from the previous version, so a game in
-     progress survives this rewrite. Do not rename these keys. */
+  // The saved shape is a contract with games already in progress. Do not
+  // rename these keys.
   function fresh(){
     return {phase:'setup', players:['','','',''],
       cfg:{max:null, down:true, bonus:10, per:2, pen:2, forbid:true}, rounds:[], cur:null};
@@ -1120,15 +943,15 @@ details.past[open] summary{background:var(--inset)}
       return s;
     }catch(e){ return null; }
   }
-  // State lives on this device only. localStorage can throw or come back empty
-  // (private browsing, cleared site data), so every access is guarded and the
-  // app must stay usable when it fails.
+  // localStorage throws in private browsing and comes back empty once site data
+  // is cleared, so every access is guarded and the app stays usable without it.
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 
   var S = load() || fresh();
   if(S.phase!=='setup' && !S.id) S.id = 'g'+Date.now();
 
-  // Rolling buffer of the last 5 games, newest first. Separate key so a corrupt game can't take it down.
+  // Rolling buffer of the last 5 games, newest first. A separate key, so a
+  // corrupt game cannot take the history down with it.
   var HKEY = 'rikiki-history-v1', HMAX = 5;
   var MEMH = null;
   function loadHistory(){
@@ -1139,8 +962,8 @@ details.past[open] summary{background:var(--inset)}
   function archive(finished){
     if(!S.id || !S.rounds.length) return;
     var H = loadHistory().filter(function(g){ return g.id !== S.id; });
-    // The whole cfg, not just the scoring: a stopped game is resumed from
-    // this entry and needs its round structure back as well.
+    // The whole cfg, not just the scoring: a stopped game is resumed from this
+    // entry and needs its round structure back as well.
     H.unshift({id:S.id, ts:Date.now(), finished:!!finished, players:S.players.slice(),
                cfg:JSON.parse(JSON.stringify(S.cfg)), rounds:JSON.parse(JSON.stringify(S.rounds))});
     MEMH = H.slice(0, HMAX);
@@ -1151,8 +974,6 @@ details.past[open] summary{background:var(--inset)}
     catch(e){ return new Date(ts).toDateString(); }
   }
 
-  /* ---------- game logic ----------
-     Unchanged from the previous version. It was correct; only the view moved. */
   function esc(x){ return String(x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function sum(a){ return a.reduce(function(x,y){ return x+y; }, 0); }
   function sign(n){ return n>0 ? '+'+n : (n<0 ? '−'+Math.abs(n) : '0'); }
@@ -1172,9 +993,8 @@ details.past[open] summary{background:var(--inset)}
   function totals(g){
     g = g || S;
     var tt = g.players.map(function(){ return 0; });
-    // r.cfg is the scoring in force when that round was recorded. Without it,
-    // changing the points mid-game silently rescores every round already
-    // played. Older saves have no r.cfg and fall back to the game's.
+    // r.cfg is the scoring in force when that round was recorded; without it,
+    // changing the points mid-game silently rescores every round already played.
     g.rounds.forEach(function(r){ r.bids.forEach(function(b,i){ tt[i] += points(b, r.made[i], r.cfg || g.cfg); }); });
     return tt;
   }
@@ -1186,30 +1006,22 @@ details.past[open] summary{background:var(--inset)}
   }
   function zeros(){ return S.players.map(function(){return 0;}); }
   function newCur(){ return {bids:zeros(), made:zeros()}; }
-  // skip = a value the stepper may never land on (the dealer's forbidden bid)
+  // skip = a value the stepper may never land on (the dealer's forbidden bid).
   function nextAllowed(v, d, min, max, skip){
     var n = v + d; if(n===skip) n += d;
     return (n<min || n>max) ? null : n;
   }
-  // The dealer's forbidden bid for the current round, or null when nothing is forbidden.
   function forbiddenBid(R){
     if(!S.cfg.forbid) return null;
     var f = R.cards - (sum(S.cur.bids) - S.cur.bids[R.dealer]);
     return (f>=0 && f<=R.cards) ? f : null;
   }
-  // Never leave the dealer sitting on the forbidden number.
   function fixDealer(R){
     var f = forbiddenBid(R), b = S.cur.bids;
     if(f!=null && b[R.dealer]===f) b[R.dealer] = (f+1<=R.cards) ? f+1 : f-1;
   }
 
   var $ = function(id){ return document.getElementById(id); };
-
-  /* ---------- rendering ----------
-     THE RULE: markup is written once and the nodes that change are patched.
-     A stepper tap calls paintRound(), which touches a handful of text nodes —
-     it never rebuilds the screen. Rows are rebuilt only when their SHAPE
-     changes, which is once per round, not once per tap. */
 
   function stepperHtml(kind, i, v, min, max, skip){
     if(skip==null) skip = -99;
@@ -1222,12 +1034,10 @@ details.past[open] summary{background:var(--inset)}
 
   function initials(n){ return (n||'?').trim().slice(0,1).toUpperCase() || '?'; }
 
-  // Rebuilt once per round, or when the phase flips. Not on a tap.
+  // Rebuilt once per round, or when the phase flips. Never on a tap: markup is
+  // written once and paintRound() patches the nodes that changed.
   function mountRound(){
     var R = roundInfo(), c = S.cur, isBids = S.phase==='bids', h = '';
-    // Players stay in the order they were entered, every round. Re-sorting the
-    // list each round so it started after the dealer meant four names moving
-    // under your thumb between hands; who deals is said in words instead.
     S.players.forEach(function(_, i){
       var isDealer = i===R.dealer;
       h += '<div class="row'+(isDealer && isBids ? ' lead':'')+'" data-row="'+i+'">'+
@@ -1241,7 +1051,6 @@ details.past[open] summary{background:var(--inset)}
     paintRound();
   }
 
-  // Called after every tap. Touches only what changed.
   function paintRound(){
     var R = roundInfo(), c = S.cur, isBids = S.phase==='bids';
     var forbidden = null;
@@ -1260,9 +1069,6 @@ details.past[open] summary{background:var(--inset)}
 
       var note = row.querySelector('[data-note="'+i+'"]');
       if(isBids){
-        // Neutral chips, in words. The dealer's restriction is a rule of the
-        // round, not a mistake the player has made, so it is not red; the
-        // status line below turns red only when the bids actually do not work.
         var parts = [];
         if(isDealer) parts.push('<span class="chip">'+esc(t('roleDeals'))+'</span>');
         if(i===R.order[0]) parts.push('<span class="chip">'+esc(t('roleFirst'))+'</span>');
@@ -1278,7 +1084,6 @@ details.past[open] summary{background:var(--inset)}
       }
     });
 
-    // Header, status and the call to action all read from the same numbers.
     UI.setText($('roundof'), t('roundOf', R.idx+1, R.count));
     UI.setText($('cardcount'), t('cards', R.cards));
     $('meta').innerHTML = t('deals', esc(S.players[R.dealer])) + '<br>' + t('leads', esc(S.players[R.order[0]]));
@@ -1301,7 +1106,6 @@ details.past[open] summary{background:var(--inset)}
     $('phasebar').querySelectorAll('[data-phase]').forEach(function(b){
       b.setAttribute('aria-pressed', b.dataset.phase === S.phase);
     });
-    // Only "go back to bids" is reachable from the tricks phase.
     UI.setAttr($('phasebar').querySelector('[data-phase="bids"]'), 'disabled', isBids);
     UI.setAttr($('phasebar').querySelector('[data-phase="tricks"]'), 'disabled', true);
     UI.setAttr($('back'), 'disabled', isBids && !S.rounds.length);
@@ -1393,13 +1197,11 @@ details.past[open] summary{background:var(--inset)}
     }
     var target = inGame ? 'hist-done' : 'hist-setup';
     $(target).innerHTML = h;
-    // Recent games belong where a game is not in progress. On the game screen
-    // the live sheet is already the thing to read.
     $(inGame ? 'hist-setup' : 'hist-done').innerHTML = '';
   }
 
-  /* Every visible string is re-applied rather than baked in at load, because
-     the language can change at any moment, from here or from the index. */
+  // Language can change at any moment, from here or from the index, so every
+  // visible string is re-applied rather than baked in at load.
   function paintText(){
     document.documentElement.lang = lang();
     document.title = t('docTitle');
@@ -1426,8 +1228,6 @@ details.past[open] summary{background:var(--inset)}
     UI.setText($('l-bonus'), t('ptsHit'));
     UI.setText($('l-per'), t('ptsPer'));
     UI.setText($('l-pen'), t('ptsPen'));
-    // The rules steppers are static markup, so their labels are set here
-    // rather than being built with the row, and they follow the language.
     document.querySelectorAll('#rules .stepper button').forEach(function(b){
       UI.setAttr(b, 'aria-label', b.dataset.d === '1' ? t('more') : t('less'));
     });
@@ -1452,15 +1252,9 @@ details.past[open] summary{background:var(--inset)}
     document.querySelectorAll('[data-tog]').forEach(function(b){
       b.setAttribute('aria-pressed', !!S.cfg[b.dataset.tog]);
     });
-    // Everything stays adjustable during a game. Scoring changes are safe
-    // because each round carries the scoring it was played under, so they
-    // only affect rounds still to come. Changes to the round STRUCTURE are
-    // guarded at the point of change instead, in applyCfg.
     UI.setText($('ruleshint'), S.phase==='setup' ? '' : t('rulesLive'));
   }
 
-  // The whole screen, for a change of screen or language. Individual taps use
-  // the narrower painters above.
   function paintAll(){
     if(S.phase==='setup'){ paintPlayers(); }
     else if(S.phase==='done'){ paintDone(); }
@@ -1475,10 +1269,8 @@ details.past[open] summary{background:var(--inset)}
     $('openrules').hidden = false;
   }
 
-  /* Apply a rules change, refusing one that would shorten the round sequence
-     past what has already been played — reducing the maximum card count or
-     turning off the descent can otherwise leave the game with more rounds on
-     the sheet than the sequence still has room for. */
+  // Refuses a change that would shorten the round sequence past what has
+  // already been played, which would leave the sheet longer than the game.
   function applyCfg(fn){
     var before = JSON.stringify(S.cfg);
     fn();
@@ -1488,12 +1280,10 @@ details.past[open] summary{background:var(--inset)}
       return;
     }
     paintRules(); save();
-    // The card count, the dots and the live points all read the config.
     if(S.phase === 'bids' || S.phase === 'tricks'){ paintRound(); paintSheet(); }
     else if(S.phase === 'done'){ paintDone(); }
   }
 
-  /* ---------- confirm ---------- */
   var onYes = null;
   function ask(title, body, label, fn){
     UI.setText($('confirmh'), title);
@@ -1504,12 +1294,9 @@ details.past[open] summary{background:var(--inset)}
     UI.openSheet('confirm');
   }
 
-  /* ---------- wiring ---------- */
   $('homelink').innerHTML = UI.icon('back', 20);
   $('openrules').innerHTML = UI.icon('cog', 20);
 
-  // The rules sheet's steppers are static markup, so unlike the player rows
-  // (which go through stepperHtml) nothing has drawn their glyphs yet.
   document.querySelectorAll('#rules .stepper button').forEach(function(b){
     b.innerHTML = UI.icon(b.dataset.d === '1' ? 'plus' : 'minus', 20);
   });
@@ -1519,11 +1306,9 @@ details.past[open] summary{background:var(--inset)}
   document.addEventListener('input', function(e){
     var i = e.target.getAttribute && e.target.getAttribute('data-name');
     if(i!=null){
+      // Stored without re-rendering the list, which would take the keyboard
+      // down mid-word.
       S.players[+i] = e.target.value;
-      // Patch the avatar in place; re-rendering the list would take the
-      // keyboard down mid-word.
-      var av = e.target.parentNode.querySelector('.av');
-      if(av) av.textContent = initials(e.target.value);
       save();
     }
   });
@@ -1535,7 +1320,6 @@ details.past[open] summary{background:var(--inset)}
     var b = e.target.closest('button');
     if(!b || b.disabled) return;
 
-    // Steppers: the hot path. Patch, never rebuild.
     var st = b.closest('.stepper');
     if(st){
       var d = +b.dataset.d;
@@ -1567,8 +1351,8 @@ details.past[open] summary{background:var(--inset)}
     if(b.dataset.resume){
       var g = loadHistory().filter(function(x){ return x.id === b.dataset.resume; })[0];
       if(g){
-        // Whatever is on the table now is kept before loading the other game,
-        // so resuming one stopped game never loses another.
+        // Keep whatever is on the table before loading the other game, so
+        // resuming one stopped game never loses another.
         archive(false);
         S.players = g.players.slice();
         S.cfg = Object.assign(fresh().cfg, g.cfg || {});
@@ -1659,7 +1443,6 @@ details.past[open] summary{background:var(--inset)}
     }
   });
 
-  // Re-render in the new language, keeping the game exactly where it was.
   window.addEventListener('jlangchange', paintText);
 
   paintText();
