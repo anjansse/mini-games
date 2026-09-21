@@ -565,24 +565,28 @@ export const UI_JS = `
         body.style.transform = '';
       });
 
-      /* And take away the ability, not just the reason. While the sheet is
-         sliding in it is partly off-screen, so anything the browser decides
-         to bring into view scrolls the sheet's content instead. Undoing that
-         from a scroll handler is too late — the event is asynchronous, so the
-         wrong position has already been painted for several frames, which is
-         the flick of "scrolled to the bottom, then jumps to the top".
-         overflow:CLIP for the length of the slide means there is nothing to
-         scroll, so the wrong frame is never drawn. It must be clip, not
-         hidden: hidden still permits programmatic scrolling, which is exactly
-         what scroll-into-view does, so it changes nothing. clip removes the
-         scroll container, and scrollTop then cannot move at all. */
-      body.style.overflow = 'clip';
-      clearTimeout(+body.dataset.settle || 0);
-      body.dataset.settle = setTimeout(function(){
-        body.style.overflow = '';
-        body.scrollTop = 0;
-        delete body.dataset.settle;
-      }, 380);
+      /* Pin the scroll to the top for the length of the slide.
+
+         NOT overflow:clip. WebKit mis-lays-out a flex item aligned to
+         flex-end while it is clipped — getBoundingClientRect reports it a
+         full element-height out, so the sheet visibly jumped up and snapped
+         back on exactly the frames the clip was applied. Measured: the
+         transform animated correctly (202 -> 53 -> 16 -> 4 -> 0) while the
+         reported top was 202px wrong on every clipped frame.
+
+         rAF runs before paint, so correcting the scroll here lands in the
+         same frame rather than a frame late, which is what made a scroll
+         listener useless. */
+      (function(){
+        var until = performance.now() + 420;
+        (function pin(){
+          if(!el.open || performance.now() > until) return;
+          if(body.scrollTop !== 0) body.scrollTop = 0;
+          requestAnimationFrame(pin);
+        })();
+      })();
+
+      debugSample(el);
     }
     el.addEventListener('click', function(e){ if(e.target === el) closeSheet(el); }, {once:true});
     dragSheet(el);
@@ -688,6 +692,37 @@ export const UI_JS = `
     return '<svg viewBox="0 0 24 24" width="' + (size||22) + '" height="' + (size||22) + '" fill="none" ' +
       'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<path d="' + d + '"/></svg>';
+  }
+
+  /* ---------- ?debug ----------
+     Inert unless the URL carries ?debug. Samples what the sheet actually does
+     while it opens and paints the numbers on screen, so one screenshot from a
+     real phone replaces a round of guessing. The thing no desktop engine can
+     reproduce is iOS's URL bar moving the viewport under a fixed element, and
+     these are the numbers that would show it. */
+  var DEBUG = location.search.indexOf('debug') > -1;
+  function debugSample(el){
+    if(!DEBUG) return;
+    var body = el.querySelector('.body'); if(!body) return;
+    var pane = document.getElementById('jdbg');
+    if(!pane){
+      pane = document.createElement('pre'); pane.id = 'jdbg';
+      pane.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;margin:0;padding:6px 8px;'+
+        'background:#000d;color:#0f0;font:10px/1.25 ui-monospace,monospace;white-space:pre;pointer-events:none';
+      document.body.appendChild(pane);
+    }
+    var vv = window.visualViewport, rows = [], n = 0;
+    rows.push('inner=' + innerHeight + ' vv=' + (vv ? Math.round(vv.height) + '@' + Math.round(vv.offsetTop) + ' scale=' + vv.scale.toFixed(2) : 'n/a') +
+              ' svh=' + Math.round(parseFloat(getComputedStyle(el).height)));
+    (function tick(){
+      if(n++ > 18) return;
+      var d = el.getBoundingClientRect(), b = body.getBoundingClientRect();
+      rows.push('f' + String(n).padStart(2) + ' dlg ' + Math.round(d.top) + '..' + Math.round(d.bottom) +
+                ' sheet ' + Math.round(b.top) + '..' + Math.round(b.bottom) +
+                ' st=' + body.scrollTop);
+      pane.textContent = rows.join('\\n');
+      requestAnimationFrame(tick);
+    })();
   }
 
   /* Wire a button to cycle auto -> light -> dark. One button rather than three
