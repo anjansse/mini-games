@@ -364,8 +364,14 @@ dialog.sheet{
   height:100svh;max-height:100svh;
   overflow:hidden;
 }
-/* Scoped to [open] so the UA's display:none for a closed dialog still wins. */
-dialog.sheet[open]{display:flex;align-items:flex-end;justify-content:center}
+/* Scoped to [open] so the UA's display:none for a closed dialog still wins.
+   display:block, NOT flex. The sheet is placed with position:absolute rather
+   than align-items:flex-end, because WebKit mis-places a flex item that is
+   aligned to flex-end AND transformed: measured on an iPhone, the slide ran
+   from +639 (one height below) straight past zero to -639 (one height ABOVE
+   its resting place), so the sheet shot up past where it belonged and came
+   back. An absolutely positioned box transforms predictably. */
+dialog.sheet[open]{display:block}
 /* The sheet is focused programmatically on open, for the keyboard and to keep
    the browser from scrolling a control into view. That is not a navigation, so
    it must not draw a focus ring — Safari puts its blue UA outline on any
@@ -373,6 +379,7 @@ dialog.sheet[open]{display:flex;align-items:flex-end;justify-content:center}
 dialog.sheet>.body:focus,dialog.sheet>.body:focus-visible{outline:none}
 dialog.sheet::backdrop{background:#0009;backdrop-filter:blur(3px);animation:fade var(--mid) var(--ease) both}
 dialog.sheet>.body{
+  position:absolute;left:0;right:0;bottom:0;margin:0 auto;
   width:100%;max-width:480px;
   background:var(--raised);border:1px solid var(--line);border-bottom:0;
   border-radius:var(--r-lg) var(--r-lg) 0 0;box-shadow:var(--lift-hi),var(--edge);
@@ -383,12 +390,19 @@ dialog.sheet>.body{
      overflowing it. Leaves a strip of backdrop above, so the page behind is
      still visible and the sheet reads as sitting on top of it. */
   max-height:88%;overflow-y:auto;overscroll-behavior:contain;
-  /* A transition, never an animation. A CSS animation with fill-mode:both
-     outranks inline styles in the cascade, so with one here every transform
-     set from JS — the drag tracking the finger, and the close — was silently
-     discarded, and the keyframe played its own movement instead. Opening and
-     closing are driven from openSheet/closeSheet. */
-  transition:transform var(--slow) var(--ease);
+  /* Opening and closing FADE; they do not slide.
+
+     A transformed sheet is mis-placed by WebKit mid-transition — measured on
+     an iPhone, the slide ran from one height below its resting place to one
+     height above it before settling — and that transient is the jump. Six
+     attempts at making the slide behave failed; a fade cannot be mis-placed
+     because nothing moves. The transform transition stays only for the drag,
+     which is driven by the finger and has never misbehaved.
+
+     A transition, never an animation: a CSS animation with fill-mode:both
+     outranks inline styles, so a keyframe here would discard every transform
+     the drag sets. */
+  transition:opacity var(--mid) var(--ease),transform var(--mid) var(--ease);
 }
 dialog.sheet>.body::before{
   content:"";display:block;width:36px;height:4px;border-radius:2px;
@@ -397,8 +411,10 @@ dialog.sheet>.body::before{
 dialog.sheet h2{margin-bottom:12px}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media (min-width:520px){
-  dialog.sheet[open]{align-items:center}
-  dialog.sheet>.body{border-radius:var(--r-lg);border-bottom:1px solid var(--line)}
+  /* Still bottom-anchored on a wide screen, just lifted off the edge. Centring
+     it would need a second translate, and stacking another transform on the
+     one that animates is exactly what went wrong on the phone. */
+  dialog.sheet>.body{bottom:24px;border-radius:var(--r-lg);border-bottom:1px solid var(--line)}
   dialog.sheet>.body::before{display:none}
 }
 
@@ -556,13 +572,14 @@ export const UI_JS = `
       // a display:none element does nothing.
       body.scrollTop = 0;
       body.style.animation = '';
+      body.style.transform = '';                 // never mid-slide any more
       body.style.transition = 'none';
-      body.style.transform = 'translateY(100%)';
+      body.style.opacity = '0';
       void body.offsetHeight;                    // flush, so the start sticks
-      if(reduce.matches){ body.style.transition = ''; body.style.transform = ''; }
+      if(reduce.matches){ body.style.transition = ''; body.style.opacity = ''; }
       else requestAnimationFrame(function(){
         body.style.transition = '';              // back to the CSS transition
-        body.style.transform = '';
+        body.style.opacity = '';
       });
 
       /* Pin the scroll to the top for the length of the slide.
@@ -648,15 +665,15 @@ export const UI_JS = `
     if(reduce.matches || !body){ if(body){ body.style.transform=''; body.style.transition=''; } el.close(); return; }
     if(body.dataset.closing === '1') return;      // one close, not one per tap
     body.dataset.closing = '1';
-    // Carries on from the current offset, so a sheet already dragged halfway
-    // down finishes the journey instead of restarting it.
-    body.style.transition = 'transform var(--mid) var(--ease)';
-    body.style.transform = 'translateY(100%)';
+    // Fades from wherever it is, including part-way through a drag, so a
+    // dragged sheet finishes rather than snapping back first.
+    body.style.transition = 'opacity var(--fast) var(--ease)';
+    body.style.opacity = '0';
     setTimeout(function(){
       delete body.dataset.closing;
-      body.style.transition = ''; body.style.transform = '';
+      body.style.transition = ''; body.style.opacity = ''; body.style.transform = '';
       el.close();
-    }, 230);
+    }, 160);
   }
 
   /* Announce something to a screen reader without showing it. A score that
