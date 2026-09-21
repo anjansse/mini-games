@@ -31,14 +31,18 @@ git switch main && git merge dev && git push # -> games.jnssn.io
 
 ## How work reaches the site
 
-**There are no pull requests and no issues.** Commit to `main` and push. Pages
-builds and deploys in roughly 30–60 seconds. Pushes to any other branch get a
-preview URL and do not touch production.
+**There are no pull requests and no issues.** Commit to `dev` and push; check
+it at `games-dev.jnssn.io`; merge `dev` into `main` when it is right. Each push
+deploys in roughly 30–60 seconds. Preview deployments are off on both projects,
+so a push to any other branch builds nothing.
 
 That is a deliberate choice for a single-maintainer repo driven from a phone:
 a PR you cannot review comfortably on a phone is a PR that sits there. The
-safety net is the build, not a reviewer — so a red build is the one thing that
-must never be pushed.
+safety net is the build plus a look at `games-dev.jnssn.io`, not a reviewer —
+so a red build is the one thing that must never be pushed.
+
+`dev` is never reset or force-pushed. `main` is only ever behind it, never
+divergent.
 
 New games are registered **disabled**. They go live when Antoine enables them,
 which is a one-line change to `config/apps.json`.
@@ -348,7 +352,7 @@ one and change the other.**
 | --- | --- |
 | One `index.html`, plus `meta.json`. No other files. | A single file is what makes offline, local-clone and simple caching all work at once. |
 | No `window.claude`, `claude.use()`, `window.storage`, `api.anthropic.com`. | Claude-runtime APIs only exist inside a Claude artifact. Here they are dead code that throws. |
-| External hosts limited to `cdnjs.cloudflare.com` and Google Fonts. | Anything else is a third party that can disappear, track your players, or break offline. |
+| External hosts limited to `cdnjs.cloudflare.com` and Google Fonts. | Anything else is a third party that can disappear, track your players, or break offline. An `xmlns` namespace URI is exempt — it names a namespace and is never fetched. |
 | A `viewport` meta tag. | Most players are on a phone. |
 | `prefers-color-scheme` support. | Half of them are in dark mode. |
 | Literal `</head>` and `</body>`. | The build injects the manifest, icons, service worker and install prompt there. |

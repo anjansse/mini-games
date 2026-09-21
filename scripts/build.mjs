@@ -1,18 +1,12 @@
 #!/usr/bin/env node
-// Generates the landing page and the Cloudflare Pages deploy directory from
-// /config/apps.json. Zero dependencies on purpose: Pages runs this with a bare
-// `node scripts/build.mjs`, so there is no install step that can fail.
+// Generates site/index.html and the Cloudflare Pages deploy tree from
+// config/apps.json. Zero dependencies: Pages runs it with a bare `node`.
 //
 //   node scripts/build.mjs          build site/index.html and dist/
 //   node scripts/build.mjs --check  validate only, write nothing
+//   node scripts/build.mjs --sync-ui  rewrite every app's UI kit block
 //
-// Anything that would ship a broken site is a hard error here rather than a
-// mystery 404 later.
-//
-// Apps under /apps stay single self-contained HTML files, so that opening one
-// straight from a git clone still works. Everything a file cannot carry on its
-// own — the web app manifest, the icons, the service worker registration — is
-// injected here, on the way into dist/.
+// Anything that would ship a broken site is a hard error here. See CLAUDE.md.
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync, copyFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -21,7 +15,6 @@ import { createHash } from 'node:crypto';
 import { iconSet, themeColor, GLYPHS, GLYPH_NAMES, defaultGlyph } from './icon.mjs';
 import { syncSource, isCurrent, uiVersion, tokens, UI_CSS, UI_JS, FONT_LINK, THEME_RUNTIME } from './ui.mjs';
 
-// The kit's own chevron, so the index points the same way a game does.
 const ARROW = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
   'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
 
@@ -29,13 +22,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK_ONLY = process.argv.includes('--check');
 const SYNC_UI = process.argv.includes('--sync-ui');
 
-/* ---------- --sync-ui ----------
-   Writes the UI kit from scripts/ui.mjs into every app and into the scaffold
-   boilerplate, then stops. This is the only thing that should ever edit the
-   fenced blocks; a normal build only checks they are current.
-
-   It runs before validation on purpose: an app whose copy is stale should be
-   fixable with one command rather than having to satisfy the validator first. */
+// Runs before validation on purpose: a stale copy should be fixable with one
+// command rather than having to satisfy the validator first.
 if (SYNC_UI) {
   const targets = [];
   const appsDir = join(ROOT, 'apps');
@@ -45,9 +33,6 @@ if (SYNC_UI) {
       if (existsSync(f)) targets.push({ file: f, slug: d, label: `apps/${d}/index.html` });
     }
   }
-  // The scaffold carries the kit too, so a new app starts current rather than
-  // stale on its first build. Its hue is a placeholder — the real one is
-  // written when the file is copied to apps/<slug>/.
   const boiler = join(ROOT, '.claude', 'skills', 'new-app', 'boilerplate.html');
   if (existsSync(boiler)) targets.push({ file: boiler, slug: null, label: '.claude/skills/new-app/boilerplate.html' });
 
@@ -85,8 +70,6 @@ function readJson(path, what) {
   catch (e) { fail(`${what}: cannot read ${path} (${e.message})`); return null; }
 }
 
-/* ---------- load and validate ---------- */
-
 const config = readJson(join(ROOT, 'config', 'apps.json'), 'config');
 if (!config || !Array.isArray(config.apps)) {
   console.error('config/apps.json is missing or has no "apps" array.');
@@ -101,8 +84,7 @@ const LANGS = site.languages;
 const DEFAULT_LANG = site.defaultLanguage;
 if (!LANGS.includes(DEFAULT_LANG)) fail(`config: defaultLanguage "${DEFAULT_LANG}" is not in languages.`);
 
-// A user-facing string is either a plain string (same in every language) or an
-// object keyed by language code.
+// A user-facing string is a plain string, or an object keyed by language code.
 function pick(value, lang, where) {
   if (value == null) return '';
   if (typeof value === 'string') return value;
@@ -140,27 +122,22 @@ for (const entry of config.apps) {
 
   const source = readFileSync(html, 'utf8');
   for (const re of FORBIDDEN) if (re.test(source)) fail(`${slug}: uses a Claude-runtime API (${re.source}). It will not work on Pages.`);
-  for (const host of new Set([...source.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1].toLowerCase()))) {
+  // xmlns="http://www.w3.org/2000/svg" names a namespace and is never fetched,
+  // so it is stripped before the host scan rather than failing the build.
+  const fetched = source.replace(/xmlns(?::[\w-]+)?\s*=\s*(["'])[^"']*\1/gi, '');
+  for (const host of new Set([...fetched.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1].toLowerCase()))) {
     if (!ALLOWED_HOSTS.includes(host)) fail(`${slug}: references ${host}, which is not on the allowlist (${ALLOWED_HOSTS.join(', ')}).`);
   }
   if (!/<meta[^>]+name=["']viewport["']/i.test(source)) fail(`${slug}: no viewport meta tag; it will not be responsive on a phone.`);
   if (!/prefers-color-scheme/.test(source)) fail(`${slug}: does not respond to prefers-color-scheme.`);
   if (!/<\/head>/i.test(source) || !/<\/body>/i.test(source)) fail(`${slug}: needs literal </head> and </body> tags; the build injects the PWA plumbing there.`);
-  // A multilingual app must actually carry the shared language runtime, or the
-  // site-wide toggle will not reach it.
   if (meta.icon && !GLYPHS[meta.icon]) {
     fail(`${slug}: meta.json icon "${meta.icon}" is not a known mark. Pick one of: ${GLYPH_NAMES.join(', ')}.`);
   }
-  // Budget: these are served to phones on mobile data and precached whole.
   const KB = Buffer.byteLength(source) / 1024;
   if (KB > 250) fail(`${slug}: index.html is ${KB.toFixed(0)} kB, over the 250 kB budget. Inline less, or split the work.`);
   else if (KB > 120) warnings.push(`${slug}: index.html is ${KB.toFixed(0)} kB; the 250 kB budget is close.`);
 
-  // The UI kit is inlined per app, which is what keeps the single-file rule and
-  // a bare `open apps/<slug>/index.html` both working — but it also means a
-  // hand-edit would silently fork the design system. This is the check that
-  // stops that. Absence is only a warning while apps are still being migrated;
-  // once every app carries the kit it becomes an error like the rest.
   if (/jnssn-ui css/.test(source)) {
     if (!isCurrent(source, slug)) {
       fail(`${slug}: its copy of the UI kit has drifted from scripts/ui.mjs. Run \`node scripts/build.mjs --sync-ui\`, and put app-specific CSS outside the fenced block.`);
@@ -195,10 +172,7 @@ if (errors.length) {
 const enabled = apps.filter((a) => a.enabled);
 const disabled = apps.filter((a) => !a.enabled);
 
-/* ---------- shared chrome ---------- */
-
-// Language is chosen once for the whole origin and every page reads the same
-// key, so switching on the index carries into each game and back.
+// Language is chosen once for the whole origin; every page reads the same key.
 const LANG_RUNTIME = `
 (function(){
   var K='jnssn-lang', LANGS=${JSON.stringify(LANGS)}, DEF=${JSON.stringify(DEFAULT_LANG)};
@@ -223,8 +197,6 @@ const LANG_RUNTIME = `
   };
 })();`.trim();
 
-// The language toggle is the kit's segmented control, so it is the same object
-// here and inside every game.
 const LANG_TOGGLE_JS = `
 function langBar(){
   var l=window.JLang; if(!l||l.langs.length<2) return '';
@@ -237,19 +209,14 @@ document.addEventListener('click',function(e){
   if(b&&window.JLang) window.JLang.set(b.getAttribute('data-lang'));
 });`.trim();
 
-// The shell runs on the same kit as the games, so the index and the game it
-// opens are visibly one product. It carries no slug, so it takes the default
-// hue; each game's own accent comes from its own slug.
 const SHELL_CSS = `
 ${tokens(null)}
 ${UI_CSS}
 
-/* --- the shell's own additions, all from the tokens above --- */
 .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 h1{font-size:34px}
 .tagline{color:var(--dim);font-size:15.5px;margin:8px 2px 22px;max-width:36ch}
 
-/* One app per row. A whole row is the tap target, not just the title. */
 a.applink{display:flex;align-items:center;gap:13px;padding:13px 14px;text-decoration:none;color:inherit;
   min-height:var(--tap);transition:background var(--fast) linear}
 a.applink:active{background:var(--inset)}
@@ -263,7 +230,6 @@ a.applink[hidden]{display:none}
 .find{margin-bottom:12px}
 .install{margin-top:18px}
 
-/* 404, offline and the switched-off page. */
 .mid{text-align:center;padding-top:10vh}
 .mid h1{font-size:30px}
 .mid p{margin:12px auto 0;max-width:34ch;color:var(--dim)}
@@ -273,16 +239,13 @@ a.applink[hidden]{display:none}
   transition:transform var(--fast) var(--spring)}
 .back:active{transform:scale(.972)}
 
-/* Hide only the variants that do NOT match the current language. Revealing a
-   match with display:revert would reset it to the UA default and discard the
-   author's own display rule, e.g. .t{display:block}. */
+/* Hide the variants that do NOT match. Revealing the match with
+   display:revert would reset it to the UA default and discard .t{display:block}. */
 ${LANGS.map((l) => `html[lang="${l}"] [data-l]:not([data-l="${l}"]){display:none}`).join('\n')}
 `.trim();
 
 const FONTS = FONT_LINK;
 
-// Renders one string in every language as sibling elements; CSS shows the one
-// matching html[lang]. No flash, and it still reads correctly with JS disabled.
 const ml = (tag, byLang, attrs = '') =>
   LANGS.map((l) => `<${tag} data-l="${l}"${attrs}>${esc(byLang[l])}</${tag}>`).join('');
 
@@ -338,8 +301,6 @@ const INSTALL_STRINGS = {
         add: 'Ajouter à l\u2019écran d\u2019accueil', close: 'Plus tard' },
 };
 
-/* ---------- landing page ---------- */
-
 const cards = enabled.length
   ? enabled.map((a) => {
       const t = Object.fromEntries(LANGS.map((l) => [l, pick(a.meta.title, l, `${a.slug}.title`)]));
@@ -355,9 +316,8 @@ const cards = enabled.length
 const NOTE = { en: 'Everything here runs entirely in your browser. Nothing you type leaves the device. Add a game to your Home Screen and it works with no signal.',
                fr: 'Tout fonctionne entièrement dans votre navigateur. Rien de ce que vous tapez ne quitte l’appareil. Ajoutez un jeu à l’écran d’accueil et il marche sans réseau.' };
 
-// A flat list stops being usable somewhere around a screenful. The filter is
-// plain DOM over already-rendered cards: no index to build, no data to ship
-// twice, and it still works if the catalogue grows by an order of magnitude.
+// Past a screenful a flat list stops being usable. Plain DOM over the cards
+// already rendered: no index to build, no data shipped twice.
 const FILTER_ON = enabled.length >= 12;
 const FIND = { en: 'Search games', fr: 'Rechercher un jeu' };
 const NONE = { en: 'Nothing matches that.', fr: 'Aucun résultat.' };
@@ -380,8 +340,6 @@ const filterJs = FILTER_ON ? `
     box.placeholder=p; box.setAttribute('aria-label',p);
     none.textContent=NONE[lang()]||NONE['${DEFAULT_LANG}'];
   }
-  // Match against the visible language only, so a French search does not hit
-  // English text the reader cannot see.
   function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
   function apply(){
     var q=norm(box.value.trim()), shown=0, l=lang();
@@ -401,11 +359,6 @@ const filterJs = FILTER_ON ? `
   label();
 })();` : '';
 
-/* A standing way in, rather than only the banner. The banner asks once and a
-   dismissal used to be final, which is the actual reason someone never ends up
-   installing it. This button appears whenever installing is possible and does
-   the most the platform allows: one tap on Android, the Share instructions on
-   iOS, where no install API exists. */
 const installJsLanding = `
 (function(){
   var b=document.getElementById('install'); if(!b) return;
@@ -493,8 +446,6 @@ if (CHECK_ONLY) {
   process.exit(0);
 }
 
-/* ---------- PWA plumbing, injected on the way into dist/ ---------- */
-
 function manifest(name, shortName, slug, start) {
   return JSON.stringify({
     name, short_name: shortName, start_url: start, scope: start,
@@ -508,8 +459,7 @@ function manifest(name, shortName, slug, start) {
   }, null, 2);
 }
 
-// Registration is deliberately silent and non-fatal: opening the file straight
-// from a git clone (file://) throws here, and the app must not care.
+// Silent and non-fatal: opening the file from a git clone (file://) throws here.
 const SW_REGISTER = `
 <script>
 if('serviceWorker' in navigator) window.addEventListener('load',function(){
@@ -517,14 +467,8 @@ if('serviceWorker' in navigator) window.addEventListener('load',function(){
 });
 </script>`;
 
-// Add to Home Screen is the whole offline story, and nothing in Safari hints
-// that it exists. iOS has no beforeinstallprompt, so the only thing that works
-// there is showing the user the Share glyph they are looking for and where it
-// is. Asks once, remembers a dismissal, and never appears once installed.
-// Built from the kit's tokens, because this is injected into every page and a
-// prompt on last year's palette on top of this year's page is exactly the kind
-// of seam a player notices. The fallbacks only ever apply to a page that
-// somehow has no kit at all.
+// iOS has no beforeinstallprompt, so there the most any UI can do is show the
+// Share glyph and where it is. Never promise a one-tap install on iPhone.
 const INSTALL_CSS = `
 .jpwa{position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));
   transform:translateY(130%);transition:transform var(--slow,340ms) var(--ease,cubic-bezier(.16,1,.3,1))}
@@ -547,7 +491,6 @@ const INSTALL_CSS = `
 @media (prefers-reduced-motion:reduce){.jpwa{transition:none}}
 `.trim();
 
-
 function installJs(iconHref, nameByLang) {
   return `
 <script>
@@ -560,9 +503,6 @@ function installJs(iconHref, nameByLang) {
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
            || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
 
-  // Dismissing suppresses the UNPROMPTED banner, not the feature. A page can
-  // still call JInstall.show() from a button the player went looking for —
-  // before, "Not now" was permanent and there was no way back to it.
   function dismissed(){ try{ return localStorage.getItem(KEY)==='no'; }catch(e){ return false; } }
   var deferred=null, el=null;
   var SHARE='<svg class="jpwa-sh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 12v7a1 1 0 001 1h12a1 1 0 001-1v-7"/></svg>';
@@ -605,24 +545,14 @@ function installJs(iconHref, nameByLang) {
     if(!standalone && !dismissed()) show();
   });
   window.addEventListener('appinstalled', function(){ standalone=true; dismiss(); announce(); });
-  // Let the page settle first, so this never competes with first paint.
   if(isIOS && !standalone && !dismissed()) setTimeout(show, 2500);
 
-  /* The page-facing API. A game or the index can offer a button that works
-     whenever installing is possible at all, however the banner went.
-
-     On Android this fires the real prompt and installs in one tap. On iOS
-     there is no install API — Safari has never shipped beforeinstallprompt —
-     so the most any button can do is show the player the Share glyph and
-     where it is. Do not promise a one-tap install on iOS; it does not exist. */
   function announce(){
     document.dispatchEvent(new CustomEvent('jinstallchange'));
   }
   window.JInstall = {
     installed: function(){ return standalone; },
-    // True when there is something a button can usefully do.
     can: function(){ return !standalone && (!!deferred || isIOS); },
-    // One tap on Android; the instructions on iOS.
     show: function(){
       if(standalone) return;
       if(deferred){
@@ -631,7 +561,6 @@ function installJs(iconHref, nameByLang) {
         d.userChoice.then(announce, announce);
         return;
       }
-      // Force it open even if the banner was dismissed before.
       if(el){ el.classList.add('on'); return; }
       show();
     }
@@ -653,8 +582,6 @@ function injectPwa(html, slug, base, nameByLang) {
     .replace(/<\/head>/i, head + '</head>')
     .replace(/<\/body>/i, SW_REGISTER + installJs(base + 'icon-192.png', nameByLang) + '\n</body>');
 }
-
-/* ---------- write ---------- */
 
 writeFileSync(join(ROOT, 'site', 'index.html'), landing);
 
@@ -679,17 +606,16 @@ put('manifest.webmanifest', manifest(SITE_TITLE[DEFAULT_LANG], SITE_TITLE[DEFAUL
 }
 
 for (const a of apps) {
+  // A disabled app's source is never uploaded, so "off" is genuinely absent
+  // from the deploy. The slug still resolves, to an explanation, not a 404.
   const base = `/${a.slug}/`;
-  // A disabled app's source is never uploaded, so "off" means genuinely absent
-  // from the deploy rather than merely unlinked. The slug still resolves, with
-  // an explanation, instead of a 404.
   const appName = Object.fromEntries(LANGS.map((l) => [l, pick(a.meta.title, l, `${a.slug}.title`)]));
   put(`${a.slug}/index.html`, injectPwa(a.enabled ? a.source : unavailable, a.slug, base, appName));
   if (!a.enabled) continue;
   put(`${a.slug}/manifest.webmanifest`, manifest(
     pick(a.meta.title, DEFAULT_LANG, a.slug), pick(a.meta.title, DEFAULT_LANG, a.slug), a.slug, base));
-  // 180 is apple-touch-icon and stays a solid tile: iOS fills transparency with
-  // black, so "bare" there would swap our tile for a black one, not remove it.
+  // 180 is apple-touch-icon and stays a solid tile: iOS fills transparency
+  // with black, so bare there swaps our tile for the OS's rather than removing it.
   const set = iconSet(a.slug, a.glyph, [180, 192, 512], [512], a.bareIcon ? [192, 512] : []);
   put(`${a.slug}/icon-180.png`, set.get('180'));
   put(`${a.slug}/icon-192.png`, set.get('192'));
@@ -697,24 +623,16 @@ for (const a of apps) {
   put(`${a.slug}/icon-mask.png`, set.get('512m'));
 }
 
-// The cache name is derived from the deployed bytes, so a deploy that changes
-// nothing does not churn caches, and one that changes anything invalidates all
-// of them.
+// The cache name is a hash of the deployed bytes: a deploy that changes nothing
+// leaves caches alone, one that changes anything invalidates them all.
 const version = createHash('sha256')
   .update(written.filter((f) => f !== '_headers').sort().map((f) => f + ':' + createHash('sha256').update(readFileSync(join(dist, f))).digest('hex')).join('\n'))
   .digest('hex').slice(0, 12);
 
-// Precache the SHELL ONLY — never the games.
-//
-// Precaching every app made a first visit download the whole catalogue: at 150
-// games that was 6.7 MB before the landing page had settled, and it grows
-// linearly. A game is cached by the fetch handler the first time it is opened,
-// which is the only way anyone plays it anyway, so offline still works for
-// everything you have actually used and costs nothing for what you have not.
-//
-// Deduplicated: Cache.addAll rejects outright if the list contains the same URL
-// twice, and that one duplicate fails the whole install, leaving the site
-// permanently uncacheable.
+// The SHELL ONLY — never the games. A game is cached by the fetch handler the
+// first time it is opened. Deduplicated, because Cache.addAll rejects outright
+// on a repeated URL and that one duplicate leaves the site uncached.
+// See CLAUDE.md, "Offline and Add to Home Screen". Do not add apps back here.
 const SHELL = ['index.html', 'offline.html', 'manifest.webmanifest',
                'icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-mask.png'];
 const precache = [...new Set([
@@ -722,10 +640,8 @@ const precache = [...new Set([
   ...SHELL.filter((f) => f !== 'index.html' && f !== 'offline.html' && written.includes(f)).map((f) => '/' + f),
 ])];
 
-// Network-first for pages, cache-first for immutable assets. Deliberately not
-// stale-while-revalidate for HTML: a bad cached page on a phone is very hard to
-// clear, so being online always means being current, and the cache only ever
-// rescues a request the network could not answer.
+// Network-first for pages so a deploy is live immediately; cache-first for
+// icons, manifests and fonts, which never change under a given URL.
 const sw = `// Generated by scripts/build.mjs. Do not edit.
 const CACHE = 'games-${version}';
 const PRECACHE = ${JSON.stringify(precache, null, 2)};
@@ -750,20 +666,16 @@ self.addEventListener('fetch', (e) => {
   const sameOrigin = url.origin === self.location.origin;
   if (!sameOrigin && !FONTS.test(req.url)) return;
 
-  // Fonts and icons never change under a given URL: serve them from the cache
-  // and only go to the network on a miss.
   if (!sameOrigin || /\\.(png|webmanifest)$/.test(url.pathname)) {
     e.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
         if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
-      }).catch(() => hit))
+      }))
     );
     return;
   }
 
-  // Pages: always prefer the network so a deploy is live immediately, and fall
-  // back to the cache only when the network cannot answer at all.
   e.respondWith(
     fetch(req)
       .then((res) => {
