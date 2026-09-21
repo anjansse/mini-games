@@ -172,7 +172,8 @@ catalogue feel unmaintained.
 | Theme choice | `JTheme` (auto/light/dark, key `jnssn-theme`) + `UI.themeButton(el)` in the bar |
 | Safe areas | `.wrap` and `.appbar` pad for the notch and home indicator |
 | Reduced motion | Every animation collapses under `prefers-reduced-motion` |
-| Modals | Native `<dialog>` — focus trap, Esc, inert background, all correct |
+| Modals | Native `<dialog>` via `UI.openSheet` — focus trap, Esc, inert background, drag down to dismiss |
+| Sheet motion | They fade rather than slide, deliberately — see `CLAUDE.md`. Do not add a slide back |
 | Tap targets | `--tap: 48px` floor on every control |
 | iOS zoom-on-focus | `.field` is 16px, which is what stops Safari zooming |
 | Screen transitions | `document.startViewTransition` where supported, plain swap elsewhere |

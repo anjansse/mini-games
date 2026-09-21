@@ -66,6 +66,15 @@ would otherwise have its accent read as a failure state.
 are patched. Never `innerHTML` a whole screen on a tap — it throws away focus,
 scroll position and screen-reader context, and makes animation impossible.
 
+**Sheets fade; they do not slide.** A transformed box inside a `<dialog>` is
+mis-placed by WebKit part-way through the transition — measured on an iPhone, a
+sheet ran from one full height below its resting place to one full height above
+it before settling, and that transient is a visible jump. Six attempts at making
+the slide behave failed; a fade cannot be mis-placed because nothing moves. The
+transform transition remains only for drag-to-dismiss, which the finger drives
+rather than a transition. Do not reintroduce a slide, and do not reach for
+`overflow:clip` around a sheet: WebKit mis-places a clipped box too.
+
 The contributor-facing version of all this is in `CONTRIBUTING.md`. Change one
 and change the other.
 
