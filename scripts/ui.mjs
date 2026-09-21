@@ -351,11 +351,26 @@ tbody th{position:sticky;left:0;background:var(--surface);color:var(--faint);fon
    however the URL bar behaves. No vh unit is involved any more. */
 dialog.sheet{
   border:0;padding:0;background:transparent;margin:0;
-  position:fixed;inset:0;width:100%;max-width:none;height:100%;max-height:none;
+  position:fixed;top:0;left:0;right:0;bottom:auto;
+  width:100%;max-width:none;
+  /* 100svh, not inset:0. A fixed element with inset:0 covers the LAYOUT
+     viewport, which on iOS is taller than the area actually on screen while
+     the URL bar is showing — so a bottom-anchored sheet sat partly below the
+     screen and shifted every time the bar animated. svh is the SMALL
+     viewport: the smallest the visible area ever gets, so a box that size
+     anchored at the top is always fully on screen and never moves when the
+     bar does. Stable beats exact here; a strip of page below the sheet when
+     the bar is hidden is far better than a sheet that jumps. */
+  height:100svh;max-height:100svh;
   overflow:hidden;
 }
 /* Scoped to [open] so the UA's display:none for a closed dialog still wins. */
 dialog.sheet[open]{display:flex;align-items:flex-end;justify-content:center}
+/* The sheet is focused programmatically on open, for the keyboard and to keep
+   the browser from scrolling a control into view. That is not a navigation, so
+   it must not draw a focus ring — Safari puts its blue UA outline on any
+   tabindex element that takes focus, which framed the whole dialog. */
+dialog.sheet>.body:focus,dialog.sheet>.body:focus-visible{outline:none}
 dialog.sheet::backdrop{background:#0009;backdrop-filter:blur(3px);animation:fade var(--mid) var(--ease) both}
 dialog.sheet>.body{
   width:100%;max-width:480px;
